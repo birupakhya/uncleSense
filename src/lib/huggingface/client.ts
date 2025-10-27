@@ -53,20 +53,23 @@ export class HuggingFaceClient {
       });
 
       if (!response.ok) {
-        throw new Error(`HuggingFace API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HuggingFace API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
       
+      // Handle different response formats
       if (Array.isArray(data) && data.length > 0) {
-        return data[0].generated_text || '';
+        return data[0].generated_text || data[0].text || '';
       }
       
       if (data.error) {
         throw new Error(`HuggingFace API error: ${data.error}`);
       }
 
-      return data.generated_text || '';
+      // Handle different field names for generated text
+      return data.generated_text || data.text || data.output || '';
     } catch (error) {
       console.error('HuggingFace API error:', error);
       throw error;
@@ -117,7 +120,12 @@ export const MODELS = {
   MISTRAL_7B: 'mistralai/Mistral-7B-Instruct-v0.2',
   LLAMA_3_8B: 'meta-llama/Llama-3-8B-Instruct',
   CODELLAMA_7B: 'codellama/CodeLlama-7b-Instruct-hf',
+  MICROSOFT_DIALOGPT: 'microsoft/DialoGPT-medium',
+  DISTILBERT: 'distilbert-base-uncased',
+  GPT2: 'gpt2',
+  BLOOM_560M: 'bigscience/bloom-560m', // Smaller, more reliable model
+  FLAN_T5_SMALL: 'google/flan-t5-small', // Good for instruction following
 } as const;
 
-// Default model for UncleSense
-export const DEFAULT_MODEL = MODELS.MISTRAL_7B;
+// Default model for UncleSense - using a reliable conversational model
+export const DEFAULT_MODEL = MODELS.FLAN_T5_SMALL;
