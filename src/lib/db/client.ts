@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import * as schema from './schema';
 
 // Database client factory
@@ -55,7 +56,17 @@ export class DatabaseService {
 
   // Transaction operations
   async createTransactions(transactions: schema.NewTransaction[]) {
-    return await this.db.insert(schema.transactions).values(transactions).returning();
+    // SQLite has a limit on the number of parameters, so we need to batch inserts
+    const batchSize = 20; // Conservative batch size for SQLite
+    const results = [];
+    
+    for (let i = 0; i < transactions.length; i += batchSize) {
+      const batch = transactions.slice(i, i + batchSize);
+      const batchResult = await this.db.insert(schema.transactions).values(batch).returning();
+      results.push(...batchResult);
+    }
+    
+    return results;
   }
 
   async getTransactionsByUploadId(uploadId: string) {
