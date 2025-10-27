@@ -33,15 +33,31 @@ app.post('/api/upload', async (c) => {
       return c.json({ success: false, error: 'No file provided' }, 400);
     }
 
-    // Validate file type
-    const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-    if (!allowedTypes.includes(file.type)) {
-      return c.json({ success: false, error: 'Invalid file type. Please upload CSV or Excel files.' }, 400);
+    // Validate file type - be more flexible with CSV files
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type.toLowerCase();
+    
+    const isCSV = fileName.endsWith('.csv') || 
+                  fileType === 'text/csv' || 
+                  fileType === 'application/csv' ||
+                  fileType === 'text/plain';
+    
+    const isExcel = fileName.endsWith('.xlsx') || 
+                    fileName.endsWith('.xls') ||
+                    fileType === 'application/vnd.ms-excel' || 
+                    fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    
+    if (!isCSV && !isExcel) {
+      return c.json({ 
+        success: false, 
+        error: 'Invalid file type. Please upload CSV or Excel files.',
+        details: { fileName, fileType, isCSV, isExcel }
+      }, 400);
     }
 
     // Parse file
     let parseResult;
-    if (file.type === 'text/csv') {
+    if (isCSV) {
       parseResult = await FileParser.parseCSV(file);
     } else {
       parseResult = await FileParser.parseExcel(file);
@@ -68,7 +84,7 @@ app.post('/api/upload', async (c) => {
       id: uploadId,
       user_id: userId,
       filename: file.name,
-      file_type: file.type === 'text/csv' ? 'csv' : 'excel',
+      file_type: isCSV ? 'csv' : 'excel',
       status: 'processing',
     });
 
