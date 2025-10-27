@@ -15,3 +15,6 @@ HUGGINGFACE_API_KEY = "YOUR_HUGGINGFACE_API_KEY_HERE"
 # Pages configuration for frontend
 [env.production]
 name = "unclesense-pages"
+
+# Pages build configuration
+pages_build_output_dir = "dist"
