@@ -6,50 +6,66 @@ import type { ParsedTransaction, FileParseResult } from '../../types';
 
 export class FileParser {
   static async parseCSV(file: File): Promise<FileParseResult> {
-    return new Promise((resolve) => {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          try {
-            const transactions = this.normalizeTransactions(results.data as any[]);
-            resolve({
-              success: true,
-              transactions,
-              metadata: {
-                file_type: 'csv',
-                total_rows: results.data.length,
-                parsed_rows: transactions.length,
-                errors: results.errors.map(e => e.message),
-              },
-            });
-          } catch (error) {
+    try {
+      // Read file as text for Cloudflare Workers compatibility
+      const text = await file.text();
+      
+      return new Promise((resolve) => {
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            try {
+              const transactions = this.normalizeTransactions(results.data as any[]);
+              resolve({
+                success: true,
+                transactions,
+                metadata: {
+                  file_type: 'csv',
+                  total_rows: results.data.length,
+                  parsed_rows: transactions.length,
+                  errors: results.errors.map(e => e.message),
+                },
+              });
+            } catch (error) {
+              resolve({
+                success: false,
+                transactions: [],
+                metadata: {
+                  file_type: 'csv',
+                  total_rows: results.data.length,
+                  parsed_rows: 0,
+                  errors: [error instanceof Error ? error.message : 'Unknown error'],
+                },
+              });
+            }
+          },
+          error: (error) => {
             resolve({
               success: false,
               transactions: [],
               metadata: {
                 file_type: 'csv',
-                total_rows: results.data.length,
+                total_rows: 0,
                 parsed_rows: 0,
-                errors: [error instanceof Error ? error.message : 'Unknown error'],
+                errors: [error.message],
               },
             });
-          }
-        },
-        error: (error) => {
-          resolve({
-            success: false,
-            transactions: [],
-            metadata: {
-              file_type: 'csv',
-              total_rows: 0,
-              parsed_rows: 0,
-              errors: [error.message],
-            },
-          });
-        },
+          },
+        });
       });
-    });
+    } catch (error) {
+      return {
+        success: false,
+        transactions: [],
+        metadata: {
+          file_type: 'csv',
+          total_rows: 0,
+          parsed_rows: 0,
+          errors: [error instanceof Error ? error.message : 'Unknown error'],
+        },
+      };
+    }
   }
 
   static async parseExcel(file: File): Promise<FileParseResult> {
