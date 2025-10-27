@@ -1,9 +1,10 @@
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import uncleMascot from "@/assets/uncle-mascot.png";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 interface HeroSectionProps {
-  onGetStarted: () => void;
+  onGetStarted?: () => void;
 }
 
 const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
@@ -33,14 +34,15 @@ const HeroSection = ({ onGetStarted }: HeroSectionProps) => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button 
-                size="lg"
-                onClick={onGetStarted}
-                className="bg-gradient-warm hover:shadow-hover transition-all duration-300 text-lg px-8 py-6 hover-lift"
-              >
-                Get Started Free
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
+              <Link to="/dashboard">
+                <Button 
+                  size="lg"
+                  className="bg-gradient-warm hover:shadow-hover transition-all duration-300 text-lg px-8 py-6 hover-lift"
+                >
+                  Get Started Free
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
               
               <Button 
                 size="lg"
