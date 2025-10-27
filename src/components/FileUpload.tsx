@@ -1,11 +1,19 @@
 import { useState, useCallback } from "react";
-import { Upload, FileText, CheckCircle2, X } from "lucide-react";
+import { Upload, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/lib/api/client";
+import type { UploadResponse } from "@/types";
 
-const FileUpload = () => {
+interface FileUploadProps {
+  onUploadComplete?: (uploadData: UploadResponse) => void;
+}
+
+const FileUpload = ({ onUploadComplete }: FileUploadProps) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  const [uploadResults, setUploadResults] = useState<Map<string, UploadResponse>>(new Map());
   const { toast } = useToast();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -17,6 +25,52 @@ const FileUpload = () => {
       setDragActive(false);
     }
   }, []);
+
+  const uploadFile = async (file: File) => {
+    const fileKey = `${file.name}-${file.size}`;
+    setUploadingFiles(prev => new Set(prev).add(fileKey));
+
+    try {
+      const response = await apiClient.uploadFile(file);
+      
+      if (response.success && response.data) {
+        setUploadResults(prev => new Map(prev).set(fileKey, response.data!));
+        
+        toast({
+          title: "File processed! 🎉",
+          description: `Uncle found ${response.data.transaction_count} transactions in ${file.name}`,
+        });
+
+        // Trigger analysis
+        const analysisResponse = await apiClient.analyzeFinances(response.data.session_id);
+        if (analysisResponse.success) {
+          toast({
+            title: "Analysis complete! 📊",
+            description: "Uncle has finished analyzing your finances. Check the insights below!",
+          });
+          
+          if (onUploadComplete) {
+            onUploadComplete(response.data);
+          }
+        }
+      } else {
+        throw new Error(response.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileKey);
+        return newSet;
+      });
+    }
+  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,6 +85,12 @@ const FileUpload = () => {
 
     if (files.length > 0) {
       setUploadedFiles(prev => [...prev, ...files]);
+      
+      // Upload each file
+      files.forEach(file => {
+        uploadFile(file);
+      });
+      
       toast({
         title: "Files uploaded! 🎉",
         description: `Uncle's checking out your ${files.length} file${files.length > 1 ? 's' : ''}...`,
@@ -48,6 +108,12 @@ const FileUpload = () => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       setUploadedFiles(prev => [...prev, ...files]);
+      
+      // Upload each file
+      files.forEach(file => {
+        uploadFile(file);
+      });
+      
       toast({
         title: "Looking good! 📊",
         description: `Uncle received your statements.`,
@@ -127,31 +193,48 @@ const FileUpload = () => {
             Uploaded Files ({uploadedFiles.length})
           </h3>
           
-          {uploadedFiles.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between bg-card p-4 rounded-xl shadow-card border border-border hover-lift"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-sage rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-secondary-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium">{file.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => removeFile(index)}
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
+          {uploadedFiles.map((file, index) => {
+            const fileKey = `${file.name}-${file.size}`;
+            const isUploading = uploadingFiles.has(fileKey);
+            const uploadResult = uploadResults.get(fileKey);
+            
+            return (
+              <div
+                key={index}
+                className="flex items-center justify-between bg-card p-4 rounded-xl shadow-card border border-border hover-lift"
               >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-          ))}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-sage rounded-lg flex items-center justify-center">
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 text-secondary-foreground animate-spin" />
+                    ) : uploadResult ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-secondary-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">{file.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(file.size / 1024).toFixed(2)} KB
+                      {uploadResult && ` • ${uploadResult.transaction_count} transactions`}
+                    </p>
+                    {isUploading && (
+                      <p className="text-xs text-blue-600">Processing...</p>
+                    )}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => removeFile(index)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                  disabled={isUploading}
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

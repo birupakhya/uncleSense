@@ -1,49 +1,105 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Bot, User } from "lucide-react";
+import { Send, Bot, User, Loader2 } from "lucide-react";
+import { apiClient } from "@/lib/api/client";
+import { useToast } from "@/hooks/use-toast";
+import type { ChatMessage } from "@/types";
 
-interface Message {
-  id: number;
-  text: string;
-  sender: "user" | "uncle";
-  timestamp: Date;
+interface ChatInterfaceProps {
+  sessionId?: string;
 }
 
-const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: "Hey there! Uncle here. Upload your statements and I'll help you make sense of your spending. What's on your mind?",
-      sender: "uncle",
-      timestamp: new Date(),
-    },
-  ]);
+const ChatInterface = ({ sessionId }: ChatInterfaceProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  // Load chat history when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      loadChatHistory();
+    } else {
+      // Show welcome message when no session
+      setMessages([{
+        id: 'welcome',
+        session_id: 'welcome',
+        role: 'assistant',
+        content: "Hey there! Uncle here. Upload your statements and I'll help you make sense of your spending. What's on your mind?",
+        created_at: new Date().toISOString(),
+      }]);
+    }
+  }, [sessionId]);
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      text: inputValue,
-      sender: "user",
-      timestamp: new Date(),
+  const loadChatHistory = async () => {
+    if (!sessionId) return;
+    
+    try {
+      const response = await apiClient.getChatHistory(sessionId);
+      if (response.success && response.data) {
+        setMessages(response.data.messages);
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || !sessionId) return;
+
+    setIsLoading(true);
+    const messageText = inputValue.trim();
+    setInputValue("");
+
+    // Add user message immediately
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      session_id: sessionId,
+      role: 'user',
+      content: messageText,
+      created_at: new Date().toISOString(),
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
 
-    // Simulate Uncle's response
-    setTimeout(() => {
-      const uncleMessage: Message = {
-        id: messages.length + 2,
-        text: "I hear you! Let me take a look at that for you. Once you upload your statements, I can give you some real insights about your spending patterns. 💡",
-        sender: "uncle",
-        timestamp: new Date(),
+    try {
+      const response = await apiClient.sendChatMessage(sessionId, messageText);
+      
+      if (response.success && response.data) {
+        const uncleMessage: ChatMessage = {
+          id: `uncle-${Date.now()}`,
+          session_id: sessionId,
+          role: 'assistant',
+          content: response.data.response,
+          created_at: new Date().toISOString(),
+        };
+        
+        setMessages(prev => [...prev, uncleMessage]);
+      } else {
+        throw new Error(response.error || 'Failed to get response');
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        session_id: sessionId,
+        role: 'assistant',
+        content: "Hey there, buddy! I'm having a bit of trouble processing your question right now. But don't worry - try asking me again in a moment! 😄",
+        created_at: new Date().toISOString(),
       };
-      setMessages(prev => [...prev, uncleMessage]);
-    }, 1000);
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Chat error",
+        description: "Uncle had trouble responding. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -71,18 +127,18 @@ const ChatInterface = () => {
             <div
               key={message.id}
               className={`flex items-start space-x-3 animate-slide-up ${
-                message.sender === "user" ? "flex-row-reverse space-x-reverse" : ""
+                message.role === "user" ? "flex-row-reverse space-x-reverse" : ""
               }`}
             >
               {/* Avatar */}
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  message.sender === "uncle"
+                  message.role === "assistant"
                     ? "bg-gradient-warm"
                     : "bg-gradient-sage"
                 }`}
               >
-                {message.sender === "uncle" ? (
+                {message.role === "assistant" ? (
                   <Bot className="w-6 h-6 text-primary-foreground" />
                 ) : (
                   <User className="w-6 h-6 text-secondary-foreground" />
@@ -92,20 +148,20 @@ const ChatInterface = () => {
               {/* Message Bubble */}
               <div
                 className={`max-w-[70%] rounded-2xl p-4 ${
-                  message.sender === "uncle"
+                  message.role === "assistant"
                     ? "bg-muted"
                     : "bg-gradient-warm text-primary-foreground"
                 }`}
               >
-                <p className="text-sm md:text-base">{message.text}</p>
+                <p className="text-sm md:text-base">{message.content}</p>
                 <p
                   className={`text-xs mt-2 ${
-                    message.sender === "uncle"
+                    message.role === "assistant"
                       ? "text-muted-foreground"
                       : "text-primary-foreground/70"
                   }`}
                 >
-                  {message.timestamp.toLocaleTimeString([], {
+                  {new Date(message.created_at).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
@@ -113,27 +169,48 @@ const ChatInterface = () => {
               </div>
             </div>
           ))}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex items-start space-x-3 animate-slide-up">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-warm">
+                <Bot className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div className="max-w-[70%] rounded-2xl p-4 bg-muted">
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Uncle is thinking...</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
         <div className="border-t border-border p-4 bg-muted/30">
           <div className="flex space-x-3">
             <Input
-              placeholder="Ask Uncle about your finances..."
+              placeholder={sessionId ? "Ask Uncle about your finances..." : "Upload statements first to chat with Uncle"}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               className="flex-1 bg-card border-border focus:ring-primary"
+              disabled={!sessionId || isLoading}
             />
             <Button
               onClick={handleSend}
-              className="bg-gradient-warm hover:shadow-hover transition-all duration-300 px-6"
+              disabled={!sessionId || isLoading || !inputValue.trim()}
+              className="bg-gradient-warm hover:shadow-hover transition-all duration-300 px-6 disabled:opacity-50"
             >
-              <Send className="w-5 h-5" />
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            Uncle's here to help - ask anything! 😊
+            {sessionId ? "Uncle's here to help - ask anything! 😊" : "Upload your financial statements to start chatting with Uncle! 📊"}
           </p>
         </div>
       </div>

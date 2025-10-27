@@ -1,168 +1,276 @@
-import { Card } from "@/components/ui/card";
+// Insights Dashboard Component
+
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
-  ShoppingCart, 
-  Coffee,
-  Home,
-  Car,
-  Utensils,
-  Trophy,
-  Target
+  AlertTriangle, 
+  CheckCircle2, 
+  Info,
+  PiggyBank,
+  Shield,
+  BarChart3,
+  Lightbulb
 } from "lucide-react";
+import { apiClient } from "@/lib/api/client";
+import { useToast } from "@/hooks/use-toast";
+import type { Insight, Transaction } from "@/types";
 
-const InsightsDashboard = () => {
-  const insights = [
-    {
-      title: "Total Spending",
-      value: "$3,847",
-      change: "+12%",
-      trend: "up",
-      icon: DollarSign,
-      color: "primary",
-    },
-    {
-      title: "Biggest Win 🎉",
-      value: "Groceries",
-      change: "-23%",
-      trend: "down",
-      icon: ShoppingCart,
-      color: "success",
-      celebration: true,
-    },
-    {
-      title: "Watch Out For",
-      value: "Coffee Runs",
-      change: "+45%",
-      trend: "up",
-      icon: Coffee,
-      color: "warning",
-    },
-    {
-      title: "Savings Goal",
-      value: "67%",
-      change: "on track",
-      trend: "neutral",
-      icon: Target,
-      color: "success",
-    },
-  ];
+interface InsightsDashboardProps {
+  sessionId?: string;
+}
 
-  const categories = [
-    { name: "Housing", amount: "$1,200", icon: Home, color: "bg-accent" },
-    { name: "Transportation", amount: "$450", icon: Car, color: "bg-primary" },
-    { name: "Food & Dining", amount: "$680", icon: Utensils, color: "bg-secondary" },
-    { name: "Shopping", amount: "$340", icon: ShoppingCart, color: "bg-warning" },
-  ];
+const InsightsDashboard = ({ sessionId }: InsightsDashboardProps) => {
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (sessionId) {
+      loadInsights();
+    }
+  }, [sessionId]);
+
+  const loadInsights = async () => {
+    if (!sessionId) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await apiClient.getInsights(sessionId);
+      if (response.success && response.data) {
+        setInsights(response.data.insights);
+        setTransactions(response.data.transactions);
+      }
+    } catch (error) {
+      console.error('Failed to load insights:', error);
+      toast({
+        title: "Failed to load insights",
+        description: "Couldn't fetch your financial insights. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getAgentIcon = (agentType: string) => {
+    switch (agentType) {
+      case 'spending_analysis':
+        return <BarChart3 className="w-5 h-5" />;
+      case 'savings_insight':
+        return <PiggyBank className="w-5 h-5" />;
+      case 'risk_assessment':
+        return <Shield className="w-5 h-5" />;
+      case 'uncle_personality':
+        return <Lightbulb className="w-5 h-5" />;
+      default:
+        return <Info className="w-5 h-5" />;
+    }
+  };
+
+  const getSentimentColor = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'negative':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+    }
+  };
+
+  const getSentimentIcon = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return <CheckCircle2 className="w-4 h-4" />;
+      case 'negative':
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <Info className="w-4 h-4" />;
+    }
+  };
+
+  const formatAgentType = (agentType: string) => {
+    return agentType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const groupedInsights = insights.reduce((acc, insight) => {
+    if (!acc[insight.agent_type]) {
+      acc[insight.agent_type] = [];
+    }
+    acc[insight.agent_type].push(insight);
+    return acc;
+  }, {} as Record<string, Insight[]>);
+
+  if (!sessionId) {
+    return (
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <h2 className="text-4xl font-display font-bold mb-4">
+            Your Financial Insights
+          </h2>
+          <p className="text-xl text-muted-foreground mb-8">
+            Upload your statements to see Uncle's analysis of your finances
+          </p>
+          <div className="bg-card rounded-2xl p-12 border border-border">
+            <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No insights yet</h3>
+            <p className="text-muted-foreground">
+              Upload your bank or credit card statements to get personalized financial insights from Uncle!
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="text-center mb-12 animate-fade-in">
-        <div className="inline-flex items-center space-x-2 bg-card/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-card mb-4">
-          <Trophy className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">Your Financial Snapshot</span>
-        </div>
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="text-center mb-8 animate-fade-in">
         <h2 className="text-4xl font-display font-bold mb-4">
-          Here's What Uncle Sees
+          What Uncle Found
         </h2>
         <p className="text-xl text-muted-foreground">
-          Upload your statements to get personalized insights!
+          Your personalized financial insights and recommendations
         </p>
       </div>
 
-      {/* Key Insights Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        {insights.map((insight, index) => (
-          <Card
-            key={index}
-            className={`p-6 hover-lift transition-all duration-300 border-2 ${
-              insight.celebration
-                ? "border-success bg-success/5 animate-bounce-in"
-                : "border-border shadow-card"
-            }`}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  insight.color === "primary"
-                    ? "bg-gradient-warm"
-                    : insight.color === "success"
-                    ? "bg-gradient-sage"
-                    : insight.color === "warning"
-                    ? "bg-warning/20"
-                    : "bg-muted"
-                }`}
-              >
-                <insight.icon
-                  className={`w-6 h-6 ${
-                    insight.color === "primary" || insight.color === "success"
-                      ? "text-white"
-                      : "text-foreground"
-                  }`}
-                />
-              </div>
-              
-              {insight.trend !== "neutral" && (
-                <div
-                  className={`flex items-center space-x-1 ${
-                    insight.trend === "down" ? "text-success" : "text-warning"
-                  }`}
-                >
-                  {insight.trend === "down" ? (
-                    <TrendingDown className="w-4 h-4" />
-                  ) : (
-                    <TrendingUp className="w-4 h-4" />
-                  )}
-                  <span className="text-sm font-medium">{insight.change}</span>
-                </div>
-              )}
-            </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      ) : insights.length === 0 ? (
+        <div className="text-center">
+          <div className="bg-card rounded-2xl p-12 border border-border">
+            <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Analysis in progress</h3>
+            <p className="text-muted-foreground">
+              Uncle is analyzing your transactions. This might take a moment...
+            </p>
+          </div>
+        </div>
+      ) : (
+        <Tabs defaultValue={Object.keys(groupedInsights)[0]} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            {Object.keys(groupedInsights).map((agentType) => (
+              <TabsTrigger key={agentType} value={agentType} className="flex items-center gap-2">
+                {getAgentIcon(agentType)}
+                {formatAgentType(agentType)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-            <h3 className="text-sm text-muted-foreground mb-1">
-              {insight.title}
-            </h3>
-            <p className="text-3xl font-display font-bold">{insight.value}</p>
-            
-            {insight.celebration && (
-              <p className="text-sm text-success mt-2 font-medium">
-                Nice job! Keep it up!
-              </p>
-            )}
-          </Card>
-        ))}
-      </div>
+          {Object.entries(groupedInsights).map(([agentType, agentInsights]) => (
+            <TabsContent key={agentType} value={agentType} className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {agentInsights.map((insight) => (
+                  <Card key={insight.id} className="hover-lift transition-all duration-300">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {getAgentIcon(agentType)}
+                          <CardTitle className="text-lg">{insight.insight_data.title}</CardTitle>
+                        </div>
+                        <Badge className={`${getSentimentColor(insight.sentiment)} flex items-center gap-1`}>
+                          {getSentimentIcon(insight.sentiment)}
+                          {insight.sentiment}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="text-base mb-4">
+                        {insight.insight_data.description}
+                      </CardDescription>
+                      
+                      {insight.insight_data.key_numbers && (
+                        <div className="space-y-2 mb-4">
+                          {Object.entries(insight.insight_data.key_numbers).map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">{key}:</span>
+                              <span className="font-semibold">
+                                {typeof value === 'number' && key.toLowerCase().includes('amount') 
+                                  ? `$${value.toLocaleString()}` 
+                                  : value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-      {/* Category Breakdown */}
-      <Card className="p-8 shadow-card border-2 border-border">
-        <h3 className="text-2xl font-display font-bold mb-6">
-          Spending by Category
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {categories.map((category, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors hover-lift"
-            >
-              <div className="flex items-center space-x-4">
-                <div className={`w-12 h-12 ${category.color} rounded-xl flex items-center justify-center`}>
-                  <category.icon className="w-6 h-6 text-white" />
-                </div>
-                <span className="font-medium">{category.name}</span>
+                      {insight.insight_data.recommendations && insight.insight_data.recommendations.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm">Recommendations:</h4>
+                          <ul className="space-y-1">
+                            {insight.insight_data.recommendations.map((rec, index) => (
+                              <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                                <span className="text-primary mt-1">•</span>
+                                {rec}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-              <span className="text-xl font-display font-bold">{category.amount}</span>
-            </div>
+            </TabsContent>
           ))}
-        </div>
+        </Tabs>
+      )}
 
-        <div className="mt-8 p-4 bg-gradient-sage rounded-xl">
-          <p className="text-center text-secondary-foreground font-medium">
-            💡 Uncle's Tip: Your grocery savings are looking great! Maybe treat yourself 
-            to something nice with that extra $120 this month.
-          </p>
+      {/* Summary Stats */}
+      {transactions.length > 0 && (
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="text-center">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Total Transactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {transactions.length}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="text-center">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Total Spending
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                ${transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0).toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="text-center">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Categories Found
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">
+                {new Set(transactions.map(t => t.category)).size}
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </Card>
+      )}
     </section>
   );
 };

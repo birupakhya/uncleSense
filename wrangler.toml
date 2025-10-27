@@ -1,0 +1,17 @@
+name = "unclesense-api"
+main = "src/worker.ts"
+compatibility_date = "2024-01-15"
+
+# D1 Database Configuration
+[[d1_databases]]
+binding = "DB"
+database_name = "unclesense-db"
+database_id = "e506f540-6015-4a8c-b9fe-0ea8f4a1e643"
+
+# Environment variables
+[vars]
+HUGGINGFACE_API_KEY = "YOUR_HUGGINGFACE_API_KEY_HERE"
+
+# Pages configuration for frontend
+[env.production]
+name = "unclesense-pages"

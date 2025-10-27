@@ -1,73 +1,180 @@
-# Welcome to your Lovable project
+# UncleSense - Agentic Finance App
 
-## Project info
+Your Uncle's Got Your Back (and Your Budget) 🧑‍💼💰
 
-**URL**: https://lovable.dev/projects/cab6b33b-221e-4a11-b564-e981121fb68c
+UncleSense is a multi-agent financial analysis application that uses AI agents to analyze your bank and credit card statements, providing quirky, practical financial advice in the voice of a wise uncle.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Multi-Agent Analysis**: 5 specialized AI agents analyze different aspects of your finances
+- **File Upload**: Support for CSV and Excel bank/credit card statements
+- **Real-time Chat**: Chat with Uncle about your financial insights
+- **Agent Insights**: Detailed analysis from spending, savings, risk, and data extraction agents
+- **Uncle Personality**: Quirky, encouraging financial advice with humor and practical wisdom
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
 
-**Use Lovable**
+## Architecture
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/cab6b33b-221e-4a11-b564-e981121fb68c) and start prompting.
+- **Frontend**: Vite + React + TypeScript + TailwindCSS
+- **Backend**: Cloudflare Workers with Hono framework
+- **Database**: Cloudflare D1 (SQLite)
+- **AI/Agents**: HuggingFace Inference API with custom agent orchestration
+- **Deployment**: Cloudflare Pages + Workers
 
-Changes made via Lovable will be committed automatically to this repo.
+## Agent System
 
-**Use your preferred IDE**
+1. **Data Extraction Agent**: Categorizes and normalizes financial transactions
+2. **Spending Analysis Agent**: Analyzes spending patterns and trends
+3. **Savings Insight Agent**: Identifies saving opportunities and positive behaviors
+4. **Risk Assessment Agent**: Flags concerning patterns and risks
+5. **Uncle Personality Agent**: Transforms technical insights into quirky, practical advice
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Setup Instructions
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js 18+ and npm
+- Cloudflare account
+- HuggingFace account and API key
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1. Clone and Install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+git clone https://github.com/birupakhya/uncle-sense-money-pal.git
+cd uncle-sense-money-pal
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 2. Environment Setup
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Set up your environment variables:
+```bash
+# Create .env.local file from template
+./setup-env.sh
+
+# Edit .env.local with your API keys
+nano .env.local  # or use your preferred editor
+```
+
+Required variables in `.env.local`:
+```
+CLOUDFLARE_API_TOKEN=your_cloudflare_token_here
+HUGGINGFACE_API_KEY=hf_your_huggingface_key_here
+VITE_API_BASE_URL=http://localhost:8787
+```
+
+### 3. Database Setup
+
+Set up the local D1 database:
+```bash
+npm run db:migrate
+```
+
+### 4. Development
+
+Start the backend worker:
+```bash
+npm run worker:dev
+```
+
+In a new terminal, start the frontend:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8787
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 5. Testing
 
-**Use GitHub Codespaces**
+1. Upload a CSV or Excel file with your bank/credit card transactions
+2. Wait for the agents to analyze your data
+3. Chat with Uncle about your financial insights
+4. Explore the insights dashboard
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+**Sample Data**: Use `sample-transactions.csv` for testing
 
-## What technologies are used for this project?
+## File Format Requirements
 
-This project is built with:
+Your CSV/Excel files should contain columns for:
+- **Date**: Transaction date (any format)
+- **Description**: Transaction description/memo
+- **Amount**: Transaction amount (positive or negative)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The system will automatically detect and normalize these columns.
 
-## How can I deploy this project?
+## Deployment
 
-Simply open [Lovable](https://lovable.dev/projects/cab6b33b-221e-4a11-b564-e981121fb68c) and click on Share -> Publish.
+### Quick Deploy
 
-## Can I connect a custom domain to my Lovable project?
+1. Set up environment variables:
+   ```bash
+   ./setup-env.sh
+   # Edit .env.local with your API keys
+   ```
 
-Yes, you can!
+2. Run the deployment script:
+   ```bash
+   ./deploy.sh
+   ```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+3. Deploy frontend to Cloudflare Pages:
+   - Go to [Cloudflare Pages](https://dash.cloudflare.com/pages)
+   - Create new project
+   - Upload the `dist/` folder
+   - Set environment variables in Pages settings
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Manual Deploy
+
+1. Deploy the worker:
+   ```bash
+   npm run worker:deploy
+   ```
+
+2. Set up production database:
+   ```bash
+   npm run db:migrate:prod
+   ```
+
+3. Build and deploy frontend:
+   ```bash
+   npm run build
+   # Upload dist/ folder to Cloudflare Pages
+   ```
+
+### Environment Variables for Production
+
+Set these in Cloudflare Pages:
+- `VITE_API_BASE_URL`: Your worker URL
+- `VITE_HUGGINGFACE_API_KEY`: Your HuggingFace API key
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+
+## API Endpoints
+
+- `POST /api/upload` - Upload financial statements
+- `POST /api/analyze` - Trigger financial analysis
+- `GET /api/insights/:sessionId` - Get analysis insights
+- `POST /api/chat` - Send chat message to Uncle
+- `GET /api/chat/:sessionId` - Get chat history
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Support
+
+For questions or issues, please open a GitHub issue or contact the development team.
+
+---
+
+Made with ❤️ by the UncleSense team
