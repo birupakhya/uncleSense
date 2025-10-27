@@ -1,0 +1,21 @@
+{
+  "build": {
+    "command": "npm run build",
+    "cwd": "/",
+    "watch": []
+  },
+  "deploy": {
+    "command": "",
+    "cwd": "/"
+  },
+  "functions": {
+    "directory": "functions"
+  },
+  "redirects": [],
+  "headers": [],
+  "dev": {
+    "command": "npm run dev",
+    "port": 8080,
+    "liveReload": true
+  }
+}
