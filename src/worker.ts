@@ -70,9 +70,17 @@ app.post('/api/upload', async (c) => {
     // Create database service
     const db = new DatabaseService(c.env.DB);
     
-    // Create a temporary user for demo purposes (in production, use proper auth)
-    const userId = 'demo-user-' + Date.now();
-    await db.createUser({ id: userId, email: 'demo@unclesense.com' });
+    // Create or get existing demo user
+    const demoEmail = 'demo@unclesense.com';
+    let user = await db.getUserByEmail(demoEmail);
+    
+    if (!user) {
+      const userId = 'demo-user-' + Date.now();
+      const newUser = await db.createUser({ id: userId, email: demoEmail });
+      user = newUser[0];
+    }
+    
+    const userId = user.id;
 
     // Create session
     const sessionId = 'session-' + Date.now();
