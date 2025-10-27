@@ -116,7 +116,12 @@ app.post('/api/upload', async (c) => {
 
   } catch (error) {
     console.error('Upload error:', error);
-    return c.json({ success: false, error: 'Upload failed' }, 500);
+    return c.json({ 
+      success: false, 
+      error: 'Upload failed',
+      details: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
   }
 });
 
