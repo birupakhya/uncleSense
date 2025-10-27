@@ -57,7 +57,7 @@ export class DatabaseService {
   // Transaction operations
   async createTransactions(transactions: schema.NewTransaction[]) {
     // SQLite has a limit on the number of parameters, so we need to batch inserts
-    const batchSize = 20; // Conservative batch size for SQLite
+    const batchSize = 10; // Smaller batch size for SQLite
     const results = [];
     
     for (let i = 0; i < transactions.length; i += batchSize) {
