@@ -252,75 +252,107 @@ export class HuggingFaceClient {
   }
 
   // Sentiment analysis method for financial texts
-  async analyzeSentiment(text: string): Promise<{
+  async analyzeSentiment(text: string, retries: number = 3): Promise<{
     label: string;
     confidence: number;
     allScores: Array<{ label: string; score: number }>;
   }> {
-    this.log('info', 'Starting sentiment analysis', { text: text.substring(0, 100) + '...' });
+    this.log('info', 'Starting sentiment analysis', { text: text.substring(0, 100) + '...', retries });
     
-    try {
-      this.log('info', 'Calling Hugging Face API', { 
-        model: 'soleimanian/financial-roberta-large-sentiment',
-        url: `${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`
-      });
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        this.log('info', `Calling Hugging Face API (attempt ${attempt}/${retries})`, { 
+          model: 'soleimanian/financial-roberta-large-sentiment',
+          url: `${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`
+        });
 
-      const response = await fetch(`${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: text,
-        }),
-      });
+        const response = await fetch(`${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: text,
+          }),
+        });
 
-      this.log('info', 'Received API response', { 
-        status: response.status,
-        ok: response.ok 
-      });
+        this.log('info', 'Received API response', { 
+          status: response.status,
+          ok: response.ok,
+          attempt
+        });
 
-      if (!response.ok) {
-        throw new Error(`Sentiment analysis failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      this.log('info', 'Parsed API response', { dataType: typeof data, isArray: Array.isArray(data) });
-
-      // Handle nested array response format
-      if (Array.isArray(data) && data.length > 0) {
-        const results = Array.isArray(data[0]) ? data[0] : data;
-        if (results.length > 0) {
-          const result = {
-            label: results[0].label,
-            confidence: results[0].score,
-            allScores: results
-          };
-          this.log('success', 'Sentiment analysis completed', result);
-          return result;
+        if (!response.ok) {
+          // Handle rate limiting and cold starts
+          if (response.status === 429) {
+            this.log('warning', 'Rate limited, waiting before retry', { attempt, status: response.status });
+            if (attempt < retries) {
+              await this.delay(2000 * attempt); // Exponential backoff
+              continue;
+            }
+          }
+          
+          if (response.status === 503) {
+            this.log('warning', 'Model is loading (cold start), waiting before retry', { attempt, status: response.status });
+            if (attempt < retries) {
+              await this.delay(5000 * attempt); // Longer wait for cold starts
+              continue;
+            }
+          }
+          
+          throw new Error(`Sentiment analysis failed: ${response.status} ${response.statusText}`);
         }
-      }
 
-      throw new Error('Unexpected response format');
-    } catch (error) {
-      this.log('error', 'Sentiment analysis failed, using fallback', { error: error.message });
-      console.warn('Sentiment analysis failed, using fallback:', error);
-      
-      // Fallback sentiment analysis
-      const textLower = text.toLowerCase();
-      let result;
-      if (textLower.includes('exceeded') || textLower.includes('growth') || textLower.includes('positive')) {
-        result = { label: 'positive', confidence: 0.8, allScores: [] };
-      } else if (textLower.includes('declined') || textLower.includes('negative') || textLower.includes('plummeted')) {
-        result = { label: 'negative', confidence: 0.8, allScores: [] };
-      } else {
-        result = { label: 'neutral', confidence: 0.7, allScores: [] };
+        const data = await response.json();
+        this.log('info', 'Parsed API response', { dataType: typeof data, isArray: Array.isArray(data), attempt });
+
+        // Handle nested array response format
+        if (Array.isArray(data) && data.length > 0) {
+          const results = Array.isArray(data[0]) ? data[0] : data;
+          if (results.length > 0) {
+            const result = {
+              label: results[0].label,
+              confidence: results[0].score,
+              allScores: results
+            };
+            this.log('success', 'Sentiment analysis completed', { ...result, attempt });
+            return result;
+          }
+        }
+
+        throw new Error('Unexpected response format');
+      } catch (error) {
+        this.log('error', `Sentiment analysis attempt ${attempt} failed`, { error: error.message, attempt });
+        
+        if (attempt === retries) {
+          this.log('error', 'All retry attempts failed, using fallback', { error: error.message });
+          break;
+        }
+        
+        // Wait before retry
+        await this.delay(1000 * attempt);
       }
-      
-      this.log('warning', 'Using fallback sentiment analysis', result);
-      return result;
     }
+    
+    // Fallback sentiment analysis
+    this.log('warning', 'Using fallback sentiment analysis after all retries failed');
+    const textLower = text.toLowerCase();
+    let result;
+    if (textLower.includes('exceeded') || textLower.includes('growth') || textLower.includes('positive')) {
+      result = { label: 'positive', confidence: 0.8, allScores: [] };
+    } else if (textLower.includes('declined') || textLower.includes('negative') || textLower.includes('plummeted')) {
+      result = { label: 'negative', confidence: 0.8, allScores: [] };
+    } else {
+      result = { label: 'neutral', confidence: 0.7, allScores: [] };
+    }
+    
+    this.log('warning', 'Using fallback sentiment analysis', result);
+    return result;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   formatFinancialPrompt(

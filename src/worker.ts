@@ -32,6 +32,49 @@ app.get('/api/debug', (c) => {
   });
 });
 
+// Test Hugging Face API endpoint
+app.get('/api/test-hf', async (c) => {
+  try {
+    if (!c.env.HUGGINGFACE_API_KEY) {
+      return c.json({ success: false, error: 'No Hugging Face API key configured' });
+    }
+
+    const testText = "AMAZON.COM AMZN.COM/BILL WA -45.99";
+    
+    const response = await fetch('https://api-inference.huggingface.co/models/soleimanian/financial-roberta-large-sentiment', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${c.env.HUGGINGFACE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: testText,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return c.json({ 
+        success: true, 
+        testText,
+        response: data,
+        status: response.status
+      });
+    } else {
+      return c.json({ 
+        success: false, 
+        error: `API call failed: ${response.status} ${response.statusText}`,
+        status: response.status
+      });
+    }
+  } catch (error) {
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Logs endpoint
 app.get('/api/logs', async (c) => {
   try {
