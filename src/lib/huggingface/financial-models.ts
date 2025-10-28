@@ -10,7 +10,7 @@ async function initializeTransformers() {
   
   try {
     // Check if we're in a browser environment and transformers is available
-    if (typeof window !== 'undefined' && typeof import !== 'undefined') {
+    if (typeof window !== 'undefined') {
       try {
         const transformers = await import('@xenova/transformers');
         pipeline = transformers.pipeline;

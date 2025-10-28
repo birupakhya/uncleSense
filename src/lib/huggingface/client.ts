@@ -391,35 +391,6 @@ export class HuggingFaceClient {
     }
   }
 
-  // Enhanced prompt formatting for financial analysis
-  formatFinancialPrompt(
-    systemContext: string,
-    financialData: any,
-    analysisType: 'spending' | 'patterns' | 'recommendations' | 'health'
-  ): string {
-    const contextMap = {
-      spending: 'spending analysis',
-      patterns: 'transaction pattern analysis',
-      recommendations: 'budget optimization recommendations',
-      health: 'financial health assessment'
-    };
-
-    return `${systemContext}
-
-Financial Data Context:
-${JSON.stringify(financialData, null, 2)}
-
-Analysis Type: ${contextMap[analysisType]}
-
-Instructions:
-- Provide specific, actionable insights
-- Use financial terminology appropriately
-- Include concrete recommendations
-- Be encouraging but honest about areas for improvement
-- Keep response concise and practical
-
-Response:`;
-  }
 }
 
 // Model configurations
