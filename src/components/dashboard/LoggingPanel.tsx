@@ -57,12 +57,20 @@ const LoggingPanel = ({ sessionId }: LoggingPanelProps) => {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/logs?session_id=${sessionId}`);
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
+      const url = `${apiBaseUrl}/api/logs?session_id=${sessionId}`;
+      
+      addLog('info', `Fetching logs from: ${url}`, { sessionId }, 'frontend');
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         if (data.logs) {
           setLogs(prev => [...data.logs, ...prev].slice(0, 100));
+          addLog('success', `Retrieved ${data.logs.length} logs from backend`, null, 'frontend');
         }
+      } else {
+        addLog('error', `API request failed: ${response.status} ${response.statusText}`, { url }, 'frontend');
       }
     } catch (error) {
       addLog('error', 'Failed to fetch logs from backend', error, 'frontend');
