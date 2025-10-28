@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Models Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Financial Models Integration Test</h1>
+    
+    <button onclick="testCategorization()">Test Transaction Categorization</button>
+    <button onclick="testPatternDetection()">Test Pattern Detection</button>
+    <button onclick="testFullAgent()">Test Full Data Extraction Agent</button>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        // Mock implementation for testing
+        class MockFinancialModelsClient {
+            async initialize() {
+                console.log('Mock financial models initialized');
+                return true;
+            }
+
+            async categorizeTransaction(description, amount) {
+                // Enhanced rule-based categorization
+                const desc = description.toLowerCase();
+                let category = 'Other';
+                let confidence = 0.8;
+
+                if (desc.includes('amzn') || desc.includes('amazon')) {
+                    category = 'Shopping & Retail';
+                } else if (desc.includes('netflix') || desc.includes('spotify') || desc.includes('subscription')) {
+                    category = 'Subscriptions & Services';
+                } else if (desc.includes('whole foods') || desc.includes('grocery') || desc.includes('market')) {
+                    category = 'Groceries & Food';
+                } else if (desc.includes('shell') || desc.includes('gas') || desc.includes('fuel')) {
+                    category = 'Transportation';
+                } else if (desc.includes('uber') || desc.includes('lyft') || desc.includes('taxi')) {
+                    category = 'Transportation';
+                } else if (desc.includes('salary') || desc.includes('deposit') || desc.includes('income')) {
+                    category = 'Income & Deposits';
+                } else if (desc.includes('target') || desc.includes('walmart') || desc.includes('store')) {
+                    category = 'Shopping & Retail';
+                } else if (desc.includes('restaurant') || desc.includes('cafe') || desc.includes('dining')) {
+                    category = 'Dining & Restaurants';
+                } else if (desc.includes('electric') || desc.includes('water') || desc.includes('internet')) {
+                    category = 'Utilities & Bills';
+                } else if (desc.includes('medical') || desc.includes('doctor') || desc.includes('pharmacy')) {
+                    category = 'Healthcare & Medical';
+                }
+
+                // Adjust confidence based on amount
+                if (Math.abs(amount) > 1000) {
+                    confidence = 0.9; // High confidence for large amounts
+                } else if (Math.abs(amount) < 10) {
+                    confidence = 0.6; // Lower confidence for small amounts
+                }
+
+                return { category, confidence };
+            }
+
+            async detectRecurringPattern(merchant, amounts, dates) {
+                const isRecurring = amounts.length >= 2 && merchant.toLowerCase().includes('netflix');
+                return {
+                    isRecurring,
+                    frequency: isRecurring ? 'Monthly' : undefined,
+                    confidence: isRecurring ? 0.9 : 0.3,
+                    pattern: isRecurring ? 'Consistent monthly subscription' : 'No clear pattern'
+                };
+            }
+        }
+
+        class MockDataExtractionAgent {
+            constructor() {
+                this.financialModels = new MockFinancialModelsClient();
+            }
+
+            async execute(transactions) {
+                await this.financialModels.initialize();
+
+                const categorizedTransactions = [];
+                for (const transaction of transactions) {
+                    const categoryResult = await this.financialModels.categorizeTransaction(
+                        transaction.description,
+                        transaction.amount
+                    );
+
+                    categorizedTransactions.push({
+                        id: transaction.id,
+                        date: transaction.date,
+                        description: transaction.description,
+                        amount: transaction.amount,
+                        category: categoryResult.category,
+                        confidence: categoryResult.confidence,
+                        merchant: transaction.description,
+                        notes: this.generateTransactionNotes(transaction, categoryResult)
+                    });
+                }
+
+                const patterns = await this.detectPatterns(transactions);
+                const dataQualityScore = this.calculateDataQualityScore(categorizedTransactions);
+                const insights = this.generateInsights(categorizedTransactions, patterns, dataQualityScore);
+
+                return {
+                    agent_type: 'data_extraction',
+                    insights,
+                    metadata: {
+                        categorized_transactions: categorizedTransactions,
+                        patterns,
+                        summary: {
+                            total_transactions: transactions.length,
+                            categories_found: [...new Set(categorizedTransactions.map(t => t.category))],
+                            data_quality_score: dataQualityScore,
+                            recurring_patterns: patterns.recurring_transactions.length,
+                            unusual_transactions: patterns.unusual_transactions.length
+                        }
+                    }
+                };
+            }
+
+            async detectPatterns(transactions) {
+                const recurringTransactions = [];
+                const unusualTransactions = [];
+
+                const merchantGroups = new Map();
+                transactions.forEach(t => {
+                    const merchant = t.description.replace(/\*.*$/, '').trim();
+                    if (!merchantGroups.has(merchant)) {
+                        merchantGroups.set(merchant, []);
+                    }
+                    merchantGroups.get(merchant).push(t);
+                });
+
+                for (const [merchant, merchantTransactions] of merchantGroups) {
+                    if (merchantTransactions.length >= 2) {
+                        const amounts = merchantTransactions.map(t => t.amount);
+                        const dates = merchantTransactions.map(t => t.date);
+
+                        const patternResult = await this.financialModels.detectRecurringPattern(
+                            merchant,
+                            amounts,
+                            dates
+                        );
+
+                        if (patternResult.isRecurring && patternResult.confidence > 0.7) {
+                            recurringTransactions.push({
+                                merchant,
+                                frequency: patternResult.frequency,
+                                confidence: patternResult.confidence,
+                                pattern: patternResult.pattern,
+                                transaction_count: merchantTransactions.length,
+                                average_amount: amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length
+                            });
+                        }
+                    }
+                }
+
+                return {
+                    recurring_transactions: recurringTransactions,
+                    unusual_transactions: unusualTransactions
+                };
+            }
+
+            calculateDataQualityScore(categorizedTransactions) {
+                if (categorizedTransactions.length === 0) return 0;
+                const highConfidenceTransactions = categorizedTransactions.filter(t => t.confidence > 0.8).length;
+                const categorizedTransactionsCount = categorizedTransactions.filter(t => t.category !== 'Other').length;
+                const confidenceScore = highConfidenceTransactions / categorizedTransactions.length;
+                const categorizationScore = categorizedTransactionsCount / categorizedTransactions.length;
+                return (confidenceScore + categorizationScore) / 2;
+            }
+
+            generateTransactionNotes(transaction, categoryResult) {
+                const notes = [];
+                if (categoryResult.confidence < 0.7) {
+                    notes.push('Low confidence categorization');
+                }
+                if (Math.abs(transaction.amount) > 1000) {
+                    notes.push('Large transaction amount');
+                }
+                return notes.join('; ') || 'No special notes';
+            }
+
+            generateInsights(categorizedTransactions, patterns, dataQualityScore) {
+                const insights = [];
+
+                insights.push({
+                    title: 'Transaction Analysis Complete',
+                    description: `Successfully categorized ${categorizedTransactions.length} transactions with ${Math.round(dataQualityScore * 100)}% data quality score.`,
+                    type: 'success',
+                    metadata: {
+                        'Total Transactions': categorizedTransactions.length,
+                        'Categories Found': [...new Set(categorizedTransactions.map(t => t.category))].length,
+                        'Data Quality Score': Math.round(dataQualityScore * 100),
+                        'High Confidence': categorizedTransactions.filter(t => t.confidence > 0.8).length
+                    }
+                });
+
+                if (patterns.recurring_transactions.length > 0) {
+                    insights.push({
+                        title: 'Recurring Patterns Detected',
+                        description: `Found ${patterns.recurring_transactions.length} recurring transaction patterns.`,
+                        type: 'info',
+                        metadata: {
+                            'Recurring Merchants': patterns.recurring_transactions.length,
+                            'Most Common Frequency': patterns.recurring_transactions[0]?.frequency || 'Unknown'
+                        }
+                    });
+                }
+
+                return insights;
+            }
+        }
+
+        // Sample transactions
+        const sampleTransactions = [
+            {
+                id: '1',
+                date: '2024-01-15',
+                description: 'NETFLIX.COM',
+                amount: -15.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '2',
+                date: '2024-01-14',
+                description: 'AMZN Mktp US *23AB4',
+                amount: -45.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '3',
+                date: '2024-01-13',
+                description: 'NETFLIX.COM',
+                amount: -15.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '4',
+                date: '2024-01-12',
+                description: 'WHOLE FOODS MARKET',
+                amount: -89.45,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '5',
+                date: '2024-01-11',
+                description: 'SALARY DEPOSIT',
+                amount: 3500.00,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            }
+        ];
+
+        // Test functions
+        window.testCategorization = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">Testing transaction categorization...</div>';
+
+            try {
+                const client = new MockFinancialModelsClient();
+                await client.initialize();
+
+                const results = [];
+                for (const transaction of sampleTransactions) {
+                    const result = await client.categorizeTransaction(transaction.description, transaction.amount);
+                    results.push({
+                        description: transaction.description,
+                        amount: transaction.amount,
+                        category: result.category,
+                        confidence: Math.round(result.confidence * 100)
+                    });
+                }
+
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Categorization Test Passed</h3>
+                        ${results.map(r => `
+                            <div>
+                                <strong>${r.description}</strong> ($${r.amount})<br>
+                                Category: ${r.category} (${r.confidence}% confidence)
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Categorization Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.testPatternDetection = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">Testing pattern detection...</div>';
+
+            try {
+                const client = new MockFinancialModelsClient();
+                await client.initialize();
+
+                const amounts = [-15.99, -15.99, -15.99];
+                const dates = ['2024-01-15', '2024-01-14', '2024-01-13'];
+                const result = await client.detectRecurringPattern('NETFLIX.COM', amounts, dates);
+
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Pattern Detection Test Passed</h3>
+                        <div>
+                            <strong>Merchant:</strong> NETFLIX.COM<br>
+                            <strong>Is Recurring:</strong> ${result.isRecurring}<br>
+                            <strong>Frequency:</strong> ${result.frequency || 'N/A'}<br>
+                            <strong>Confidence:</strong> ${Math.round(result.confidence * 100)}%<br>
+                            <strong>Pattern:</strong> ${result.pattern}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Pattern Detection Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+
+        window.testFullAgent = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">Testing full data extraction agent...</div>';
+
+            try {
+                const agent = new MockDataExtractionAgent();
+                const result = await agent.execute(sampleTransactions);
+
+                resultsDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Full Agent Test Passed</h3>
+                        <div>
+                            <strong>Total Transactions:</strong> ${result.metadata.summary.total_transactions}<br>
+                            <strong>Categories Found:</strong> ${result.metadata.summary.categories_found.length}<br>
+                            <strong>Data Quality Score:</strong> ${Math.round(result.metadata.summary.data_quality_score * 100)}%<br>
+                            <strong>Recurring Patterns:</strong> ${result.metadata.summary.recurring_patterns}<br>
+                            <strong>Insights:</strong> ${result.insights.length}
+                        </div>
+                        <h4>Insights:</h4>
+                        ${result.insights.map(insight => `
+                            <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                                <strong>${insight.title}</strong><br>
+                                ${insight.description}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Full Agent Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

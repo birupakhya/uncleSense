@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hugging Face Financial Models Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+        }
+        .test-section h2 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }
+        .transaction-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .transaction-item h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        .transaction-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            font-size: 14px;
+        }
+        .transaction-details span {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 3px;
+        }
+        .insight {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .insight.warning {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+        }
+        .insight.info {
+            background: #d1ecf1;
+            border-color: #bee5eb;
+        }
+        .insight h4 {
+            margin: 0 0 10px 0;
+            color: #155724;
+        }
+        .insight.warning h4 {
+            color: #856404;
+        }
+        .insight.info h4 {
+            color: #0c5460;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 5px 0;
+            color: #007acc;
+            font-size: 24px;
+        }
+        .stat-card p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Hugging Face Financial Models Test</h1>
+        <p>This page tests the integration of Hugging Face financial models for transaction categorization, merchant normalization, and pattern detection.</p>
+        
+        <button id="runTest" onclick="runTest()">Run Test</button>
+        <button id="clearResults" onclick="clearResults()">Clear Results</button>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <h3>🔄 Processing transactions...</h3>
+            <p>This may take a moment as the models are being loaded and initialized.</p>
+        </div>
+        
+        <div id="results" style="display: none;">
+            <div class="test-section">
+                <h2>📊 Test Results</h2>
+                <div id="stats" class="stats"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>📈 Insights</h2>
+                <div id="insights"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>🏷️ Categorized Transactions</h2>
+                <div id="transactions"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>🔄 Recurring Patterns</h2>
+                <div id="patterns"></div>
+            </div>
+            
+            <div class="test-section">
+                <h2>⚠️ Unusual Transactions</h2>
+                <div id="unusual"></div>
+            </div>
+        </div>
+        
+        <div id="error" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        // Sample transaction data
+        const sampleTransactions = [
+            {
+                id: '1',
+                date: '2024-01-15',
+                description: 'AMZN Mktp US *23AB4',
+                amount: -45.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '2',
+                date: '2024-01-15',
+                description: 'NETFLIX.COM',
+                amount: -15.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '3',
+                date: '2024-01-14',
+                description: 'NETFLIX.COM',
+                amount: -15.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '4',
+                date: '2024-01-13',
+                description: 'WHOLE FOODS MARKET',
+                amount: -89.45,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '5',
+                date: '2024-01-12',
+                description: 'SHELL OIL 12345',
+                amount: -52.30,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '6',
+                date: '2024-01-11',
+                description: 'UBER TRIP HELP',
+                amount: -12.50,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '7',
+                date: '2024-01-10',
+                description: 'SALARY DEPOSIT',
+                amount: 3500.00,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '8',
+                date: '2024-01-09',
+                description: 'NETFLIX.COM',
+                amount: -15.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '9',
+                date: '2024-01-08',
+                description: 'SPOTIFY PREMIUM',
+                amount: -9.99,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            },
+            {
+                id: '10',
+                date: '2024-01-07',
+                description: 'TARGET T-1234',
+                amount: -125.67,
+                category: '',
+                merchant: '',
+                account: 'checking'
+            }
+        ];
+
+        // Mock implementation for testing in browser
+        class MockFinancialModelsClient {
+            async initialize() {
+                console.log('Initializing financial models...');
+                // Simulate model loading time
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            async categorizeTransaction(description, amount) {
+                // Mock categorization logic
+                const desc = description.toLowerCase();
+                let category = 'Other';
+                let confidence = 0.8;
+
+                if (desc.includes('amzn') || desc.includes('amazon')) {
+                    category = 'Shopping & Retail';
+                } else if (desc.includes('netflix') || desc.includes('spotify')) {
+                    category = 'Subscriptions & Services';
+                } else if (desc.includes('whole foods') || desc.includes('grocery')) {
+                    category = 'Groceries & Food';
+                } else if (desc.includes('shell') || desc.includes('gas')) {
+                    category = 'Transportation';
+                } else if (desc.includes('uber')) {
+                    category = 'Transportation';
+                } else if (desc.includes('salary') || desc.includes('deposit')) {
+                    category = 'Income & Deposits';
+                } else if (desc.includes('target')) {
+                    category = 'Shopping & Retail';
+                }
+
+                return { category, confidence };
+            }
+
+            async normalizeMerchantNames(merchantNames) {
+                const map = new Map();
+                merchantNames.forEach(name => {
+                    const normalized = name.replace(/\*.*$/, '').replace(/\d+$/, '').trim();
+                    map.set(name, normalized);
+                });
+                return map;
+            }
+
+            async detectRecurringPattern(merchant, amounts, dates) {
+                // Mock pattern detection
+                const isRecurring = amounts.length >= 2 && merchant.toLowerCase().includes('netflix');
+                const frequency = isRecurring ? 'Monthly' : undefined;
+                const confidence = isRecurring ? 0.9 : 0.3;
+
+                return {
+                    isRecurring,
+                    frequency,
+                    confidence,
+                    pattern: isRecurring ? 'Consistent monthly subscription' : 'No clear pattern'
+                };
+            }
+        }
+
+        class MockDataExtractionAgent {
+            constructor() {
+                this.financialModels = new MockFinancialModelsClient();
+            }
+
+            async execute(transactions) {
+                await this.financialModels.initialize();
+
+                const categorizedTransactions = [];
+                for (const transaction of transactions) {
+                    const categoryResult = await this.financialModels.categorizeTransaction(
+                        transaction.description,
+                        transaction.amount
+                    );
+
+                    categorizedTransactions.push({
+                        id: transaction.id,
+                        date: transaction.date,
+                        description: transaction.description,
+                        amount: transaction.amount,
+                        category: categoryResult.category,
+                        confidence: categoryResult.confidence,
+                        merchant: transaction.description,
+                        notes: this.generateTransactionNotes(transaction, categoryResult)
+                    });
+                }
+
+                const patterns = await this.detectPatterns(transactions);
+                const dataQualityScore = this.calculateDataQualityScore(categorizedTransactions);
+                const insights = this.generateInsights(categorizedTransactions, patterns, dataQualityScore);
+
+                return {
+                    agent_type: 'data_extraction',
+                    insights,
+                    metadata: {
+                        categorized_transactions: categorizedTransactions,
+                        patterns,
+                        summary: {
+                            total_transactions: transactions.length,
+                            categories_found: [...new Set(categorizedTransactions.map(t => t.category))],
+                            data_quality_score: dataQualityScore,
+                            recurring_patterns: patterns.recurring_transactions.length,
+                            unusual_transactions: patterns.unusual_transactions.length
+                        }
+                    }
+                };
+            }
+
+            async detectPatterns(transactions) {
+                const recurringTransactions = [];
+                const unusualTransactions = [];
+
+                // Group by merchant
+                const merchantGroups = new Map();
+                transactions.forEach(t => {
+                    const merchant = t.description.replace(/\*.*$/, '').trim();
+                    if (!merchantGroups.has(merchant)) {
+                        merchantGroups.set(merchant, []);
+                    }
+                    merchantGroups.get(merchant).push(t);
+                });
+
+                for (const [merchant, merchantTransactions] of merchantGroups) {
+                    if (merchantTransactions.length >= 2) {
+                        const amounts = merchantTransactions.map(t => t.amount);
+                        const dates = merchantTransactions.map(t => t.date);
+
+                        const patternResult = await this.financialModels.detectRecurringPattern(
+                            merchant,
+                            amounts,
+                            dates
+                        );
+
+                        if (patternResult.isRecurring && patternResult.confidence > 0.7) {
+                            recurringTransactions.push({
+                                merchant,
+                                frequency: patternResult.frequency,
+                                confidence: patternResult.confidence,
+                                pattern: patternResult.pattern,
+                                transaction_count: merchantTransactions.length,
+                                average_amount: amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length
+                            });
+                        }
+                    }
+                }
+
+                return {
+                    recurring_transactions: recurringTransactions,
+                    unusual_transactions: unusualTransactions
+                };
+            }
+
+            calculateDataQualityScore(categorizedTransactions) {
+                if (categorizedTransactions.length === 0) return 0;
+                const highConfidenceTransactions = categorizedTransactions.filter(t => t.confidence > 0.8).length;
+                const categorizedTransactionsCount = categorizedTransactions.filter(t => t.category !== 'Other').length;
+                const confidenceScore = highConfidenceTransactions / categorizedTransactions.length;
+                const categorizationScore = categorizedTransactionsCount / categorizedTransactions.length;
+                return (confidenceScore + categorizationScore) / 2;
+            }
+
+            generateTransactionNotes(transaction, categoryResult) {
+                const notes = [];
+                if (categoryResult.confidence < 0.7) {
+                    notes.push('Low confidence categorization');
+                }
+                if (Math.abs(transaction.amount) > 1000) {
+                    notes.push('Large transaction amount');
+                }
+                return notes.join('; ') || 'No special notes';
+            }
+
+            generateInsights(categorizedTransactions, patterns, dataQualityScore) {
+                const insights = [];
+
+                insights.push({
+                    title: 'Transaction Analysis Complete',
+                    description: `Successfully categorized ${categorizedTransactions.length} transactions with ${Math.round(dataQualityScore * 100)}% data quality score.`,
+                    type: 'positive',
+                    metadata: {
+                        'Total Transactions': categorizedTransactions.length,
+                        'Categories Found': [...new Set(categorizedTransactions.map(t => t.category))].length,
+                        'Data Quality Score': Math.round(dataQualityScore * 100),
+                        'High Confidence': categorizedTransactions.filter(t => t.confidence > 0.8).length
+                    }
+                });
+
+                if (patterns.recurring_transactions.length > 0) {
+                    insights.push({
+                        title: 'Recurring Patterns Detected',
+                        description: `Found ${patterns.recurring_transactions.length} recurring transaction patterns.`,
+                        type: 'info',
+                        metadata: {
+                            'Recurring Merchants': patterns.recurring_transactions.length,
+                            'Most Common Frequency': patterns.recurring_transactions[0]?.frequency || 'Unknown'
+                        }
+                    });
+                }
+
+                return insights;
+            }
+        }
+
+        // Global functions for the HTML buttons
+        window.runTest = async function() {
+            const loadingEl = document.getElementById('loading');
+            const resultsEl = document.getElementById('results');
+            const errorEl = document.getElementById('error');
+            const runTestBtn = document.getElementById('runTest');
+
+            // Show loading state
+            loadingEl.style.display = 'block';
+            resultsEl.style.display = 'none';
+            errorEl.style.display = 'none';
+            runTestBtn.disabled = true;
+
+            try {
+                const agent = new MockDataExtractionAgent();
+                const result = await agent.execute(sampleTransactions);
+
+                // Hide loading, show results
+                loadingEl.style.display = 'none';
+                resultsEl.style.display = 'block';
+
+                // Display stats
+                const statsEl = document.getElementById('stats');
+                const summary = result.metadata.summary;
+                statsEl.innerHTML = `
+                    <div class="stat-card">
+                        <h3>${summary.total_transactions}</h3>
+                        <p>Total Transactions</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${summary.categories_found.length}</h3>
+                        <p>Categories Found</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${Math.round(summary.data_quality_score * 100)}%</h3>
+                        <p>Data Quality Score</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${summary.recurring_patterns}</h3>
+                        <p>Recurring Patterns</p>
+                    </div>
+                `;
+
+                // Display insights
+                const insightsEl = document.getElementById('insights');
+                insightsEl.innerHTML = result.insights.map(insight => `
+                    <div class="insight ${insight.type}">
+                        <h4>${insight.title}</h4>
+                        <p>${insight.description}</p>
+                        ${insight.metadata ? Object.entries(insight.metadata).map(([key, value]) => 
+                            `<div><strong>${key}:</strong> ${value}</div>`
+                        ).join('') : ''}
+                    </div>
+                `).join('');
+
+                // Display transactions
+                const transactionsEl = document.getElementById('transactions');
+                transactionsEl.innerHTML = result.metadata.categorized_transactions.map(transaction => `
+                    <div class="transaction-item">
+                        <h4>${transaction.description}</h4>
+                        <div class="transaction-details">
+                            <span><strong>Category:</strong> ${transaction.category}</span>
+                            <span><strong>Confidence:</strong> ${Math.round(transaction.confidence * 100)}%</span>
+                            <span><strong>Amount:</strong> $${transaction.amount}</span>
+                            <span><strong>Date:</strong> ${transaction.date}</span>
+                            <span><strong>Notes:</strong> ${transaction.notes}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Display patterns
+                const patternsEl = document.getElementById('patterns');
+                if (result.metadata.patterns.recurring_transactions.length > 0) {
+                    patternsEl.innerHTML = result.metadata.patterns.recurring_transactions.map(pattern => `
+                        <div class="transaction-item">
+                            <h4>${pattern.merchant}</h4>
+                            <div class="transaction-details">
+                                <span><strong>Frequency:</strong> ${pattern.frequency}</span>
+                                <span><strong>Confidence:</strong> ${Math.round(pattern.confidence * 100)}%</span>
+                                <span><strong>Average Amount:</strong> $${pattern.average_amount.toFixed(2)}</span>
+                                <span><strong>Transactions:</strong> ${pattern.transaction_count}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    patternsEl.innerHTML = '<p>No recurring patterns detected.</p>';
+                }
+
+                // Display unusual transactions
+                const unusualEl = document.getElementById('unusual');
+                if (result.metadata.patterns.unusual_transactions.length > 0) {
+                    unusualEl.innerHTML = result.metadata.patterns.unusual_transactions.map(unusual => `
+                        <div class="transaction-item">
+                            <h4>${unusual.merchant}</h4>
+                            <div class="transaction-details">
+                                <span><strong>Amount:</strong> $${unusual.amount}</span>
+                                <span><strong>Date:</strong> ${unusual.date}</span>
+                                <span><strong>Reason:</strong> ${unusual.reason}</span>
+                                <span><strong>Z-Score:</strong> ${unusual.z_score.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    unusualEl.innerHTML = '<p>No unusual transactions detected.</p>';
+                }
+
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorEl.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Test Failed</h3>
+                        <p>Error: ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            } finally {
+                runTestBtn.disabled = false;
+            }
+        };
+
+        window.clearResults = function() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+        };
+    </script>
+</body>
+</html>

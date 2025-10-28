@@ -12,7 +12,7 @@ if [ ! -f ".env.local" ]; then
 fi
 
 # Get the API key from .env.local
-api_key=$(grep "VITE_HUGGINGFACE_API_KEY" .env.local | cut -d'=' -f2)
+api_key=$(grep "HUGGINGFACE_API_KEY" .env.local | cut -d'=' -f2)
 
 if [ -z "$api_key" ]; then
     echo "❌ No HuggingFace API key found in .env.local!"

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hugging Face Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { border-color: #4CAF50; background-color: #f1f8e9; }
+        .error { border-color: #f44336; background-color: #ffebee; }
+        .warning { border-color: #ff9800; background-color: #fff3e0; }
+        button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #1976D2; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Hugging Face Integration Test</h1>
+        <p>This page tests the Hugging Face API integration directly from the browser.</p>
+        
+        <div class="test-section">
+            <h3>API Configuration</h3>
+            <p><strong>API Key:</strong> [Set via environment variable]</p>
+            <p><strong>Model:</strong> soleimanian/financial-roberta-large-sentiment</p>
+            <p><strong>Endpoint:</strong> https://api-inference.huggingface.co/models/soleimanian/financial-roberta-large-sentiment</p>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Controls</h3>
+            <button onclick="runBasicTest()">Run Basic Test</button>
+            <button onclick="runRetryTest()">Run Retry Test</button>
+            <button onclick="runCustomTest()">Run Custom Test</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Custom Test Input</h3>
+            <textarea id="customInput" placeholder="Enter text to analyze..." style="width: 100%; height: 60px; margin-bottom: 10px;">AMAZON.COM AMZN.COM/BILL WA -45.99</textarea>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Results</h3>
+            <div id="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Console Logs</h3>
+            <div id="logs" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Frontend Hugging Face Client
+        class FrontendHuggingFaceClient {
+            constructor(apiKey) {
+                this.apiKey = apiKey;
+                this.baseUrl = 'https://api-inference.huggingface.co/models';
+            }
+
+            async analyzeSentiment(text, retries = 3) {
+                this.log(`Starting sentiment analysis: ${text.substring(0, 50)}...`);
+                
+                for (let attempt = 1; attempt <= retries; attempt++) {
+                    try {
+                        this.log(`Attempt ${attempt}/${retries}`);
+                        
+                        const response = await fetch(`${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                inputs: text,
+                            }),
+                        });
+
+                        this.log(`Response status: ${response.status}`);
+
+                        if (!response.ok) {
+                            if (response.status === 429) {
+                                this.log(`Rate limited, waiting...`);
+                                if (attempt < retries) {
+                                    await this.delay(2000 * attempt);
+                                    continue;
+                                }
+                            }
+                            
+                            if (response.status === 503) {
+                                this.log(`Model loading, waiting...`);
+                                if (attempt < retries) {
+                                    await this.delay(5000 * attempt);
+                                    continue;
+                                }
+                            }
+                            
+                            throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+                        }
+
+                        const data = await response.json();
+                        this.log(`Response data:`, data);
+
+                        if (Array.isArray(data) && data.length > 0) {
+                            const results = Array.isArray(data[0]) ? data[0] : data;
+                            if (results.length > 0) {
+                                const result = {
+                                    label: results[0].label,
+                                    confidence: results[0].score,
+                                    allScores: results
+                                };
+                                this.log(`Success: ${result.label} (${(result.confidence * 100).toFixed(1)}%)`);
+                                return result;
+                            }
+                        }
+
+                        throw new Error('Unexpected response format');
+                    } catch (error) {
+                        this.log(`Attempt ${attempt} failed: ${error.message}`);
+                        
+                        if (attempt === retries) {
+                            this.log(`All attempts failed, using fallback`);
+                            break;
+                        }
+                        
+                        await this.delay(1000 * attempt);
+                    }
+                }
+                
+                // Fallback analysis
+                this.log(`Using fallback analysis`);
+                const textLower = text.toLowerCase();
+                let result;
+                if (textLower.includes('exceeded') || textLower.includes('growth') || textLower.includes('positive')) {
+                    result = { label: 'positive', confidence: 0.8, allScores: [] };
+                } else if (textLower.includes('declined') || textLower.includes('negative') || textLower.includes('plummeted')) {
+                    result = { label: 'negative', confidence: 0.8, allScores: [] };
+                } else {
+                    result = { label: 'neutral', confidence: 0.7, allScores: [] };
+                }
+                
+                return result;
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            log(message, data = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}`;
+                console.log(logMessage, data || '');
+                
+                const logsDiv = document.getElementById('logs');
+                const logEntry = document.createElement('div');
+                logEntry.textContent = logMessage + (data ? ' ' + JSON.stringify(data) : '');
+                logsDiv.appendChild(logEntry);
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+        }
+
+        // Initialize client - API key should be set via environment variable
+        const apiKey = 'YOUR_HUGGINGFACE_API_KEY_HERE'; // Replace with actual API key
+        const client = new FrontendHuggingFaceClient(apiKey);
+
+        // Test functions
+        async function runBasicTest() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h4>Basic Test Results:</h4>';
+            
+            const testTexts = [
+                "AMAZON.COM AMZN.COM/BILL WA -45.99",
+                "SALARY DEPOSIT +3500.00",
+                "NETFLIX.COM -15.99",
+                "WHOLE FOODS MARKET -89.45"
+            ];
+            
+            for (const text of testTexts) {
+                const result = await client.analyzeSentiment(text);
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'result';
+                resultDiv.innerHTML = `
+                    <strong>Text:</strong> ${text}<br>
+                    <strong>Sentiment:</strong> ${result.label}<br>
+                    <strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%
+                `;
+                resultsDiv.appendChild(resultDiv);
+                
+                // Wait between requests
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        async function runRetryTest() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h4>Retry Test Results:</h4>';
+            
+            // Test with a text that might trigger rate limiting
+            const text = "This is a test transaction for rate limiting";
+            const result = await client.analyzeSentiment(text, 5); // 5 retries
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = `
+                <strong>Text:</strong> ${text}<br>
+                <strong>Sentiment:</strong> ${result.label}<br>
+                <strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%<br>
+                <strong>Retries:</strong> 5 attempts
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function runCustomTest() {
+            const customInput = document.getElementById('customInput').value;
+            if (!customInput.trim()) {
+                alert('Please enter some text to analyze');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h4>Custom Test Results:</h4>';
+            
+            const result = await client.analyzeSentiment(customInput);
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = `
+                <strong>Text:</strong> ${customInput}<br>
+                <strong>Sentiment:</strong> ${result.label}<br>
+                <strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-run basic test on page load
+        window.onload = function() {
+            client.log('Page loaded, ready for testing');
+        };
+    </script>
+</body>
+</html>
