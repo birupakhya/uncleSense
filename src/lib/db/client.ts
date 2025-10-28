@@ -30,7 +30,23 @@ export class DatabaseService {
 
   // Session operations
   async createSession(session: schema.NewSession) {
-    return await this.db.insert(schema.sessions).values(session).returning();
+    try {
+      return await this.db.insert(schema.sessions).values(session).returning();
+    } catch (error) {
+      // Fallback for databases without upload_id column
+      if (error.message && error.message.includes('no column named upload_id')) {
+        console.log('Creating session without upload_id (fallback)');
+        const { upload_id, ...sessionWithoutUploadId } = session as any;
+        return await this.db.insert(schema.sessions).values(sessionWithoutUploadId).returning();
+      }
+      console.log('Session creation error:', error.message);
+      console.log('Error details:', error);
+      console.log('Session object:', session);
+      console.log('Error type:', typeof error);
+      console.log('Error constructor:', error.constructor.name);
+      console.log('Error stack:', error.stack);
+      throw error;
+    }
   }
 
   async getSessionById(id: string) {
@@ -39,7 +55,17 @@ export class DatabaseService {
 
   // Upload operations
   async createUpload(upload: schema.NewUpload) {
-    return await this.db.insert(schema.uploads).values(upload).returning();
+    try {
+      return await this.db.insert(schema.uploads).values(upload).returning();
+    } catch (error) {
+      // Fallback for databases without session_id column
+      if (error.message && error.message.includes('session_id')) {
+        console.log('Creating upload without session_id (fallback)');
+        const { session_id, ...uploadWithoutSessionId } = upload as any;
+        return await this.db.insert(schema.uploads).values(uploadWithoutSessionId).returning();
+      }
+      throw error;
+    }
   }
 
   async getUploadsByUserId(userId: string) {
@@ -74,13 +100,17 @@ export class DatabaseService {
   }
 
   async getTransactionsBySessionId(sessionId: string) {
-    return await this.db
-      .select()
-      .from(schema.transactions)
-      .innerJoin(schema.uploads, eq(schema.transactions.upload_id, schema.uploads.id))
-      .innerJoin(schema.sessions, eq(schema.uploads.user_id, schema.sessions.user_id))
-      .where(eq(schema.sessions.id, sessionId))
-      .all();
+    try {
+      // For now, treat sessionId as uploadId since we're using upload_id as session_id
+      return await this.db
+        .select()
+        .from(schema.transactions)
+        .where(eq(schema.transactions.upload_id, sessionId))
+        .all();
+    } catch (error) {
+      console.log('Error getting transactions by session:', error);
+      return [];
+    }
   }
 
   // Insight operations
@@ -133,4 +163,4 @@ export class DatabaseService {
 }
 
 // Import Drizzle operators
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';

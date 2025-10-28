@@ -13,12 +13,27 @@ export class DataExtractionAgent extends BaseAgent {
   }
 
   async execute(transactions: Transaction[]): Promise<AgentResponse> {
-    try {
-      console.log(`[DataExtraction] Starting analysis of ${transactions.length} transactions`);
+    console.log(`[DataExtraction] Starting analysis of ${transactions.length} transactions`);
+    
+    // Process transactions in chunks to avoid overwhelming the system
+    const CHUNK_SIZE = 50; // Process 50 transactions at a time
+    const chunks = [];
+    for (let i = 0; i < transactions.length; i += CHUNK_SIZE) {
+      chunks.push(transactions.slice(i, i + CHUNK_SIZE));
+    }
+    
+    console.log(`[DataExtraction] Processing ${chunks.length} chunks of up to ${CHUNK_SIZE} transactions each`);
+    
+    const allCategorizedTransactions = [];
+    const categories = new Set<string>();
+    
+    // Process each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`[DataExtraction] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} transactions)`);
       
-      // Simple rule-based categorization without API calls
-      const categorizedTransactions = transactions.map(transaction => {
-        const description = transaction.description.toLowerCase();
+      const categorizedChunk = chunk.map(transaction => {
+        const description = transaction.description?.toLowerCase() || '';
         let category = 'Other';
         
         if (description.includes('amazon') || description.includes('amzn')) {
@@ -33,7 +48,15 @@ export class DataExtractionAgent extends BaseAgent {
           category = 'Housing';
         } else if (description.includes('utility') || description.includes('electric')) {
           category = 'Utilities';
+        } else if (description.includes('netflix') || description.includes('spotify')) {
+          category = 'Entertainment';
+        } else if (description.includes('salary') || description.includes('deposit')) {
+          category = 'Income';
+        } else if (description.includes('uber') || description.includes('lyft')) {
+          category = 'Transportation';
         }
+        
+        categories.add(category);
         
         return {
           id: transaction.id,
@@ -47,51 +70,61 @@ export class DataExtractionAgent extends BaseAgent {
           sentiment: 'neutral'
         };
       });
-
-      console.log(`[DataExtraction] Categorized ${categorizedTransactions.length} transactions`);
-
-      // Generate simple insights
-      const insights = [
-        {
-          title: 'Transaction Categorization Complete',
-          description: `Successfully categorized ${transactions.length} transactions using rule-based analysis.`,
-          confidence: 0.8,
-          metadata: { method: 'rule-based' }
-        },
-        {
-          title: 'Spending Categories Identified',
-          description: `Found transactions in categories: ${[...new Set(categorizedTransactions.map(t => t.category))].join(', ')}`,
-          confidence: 0.9,
-          metadata: { categories: [...new Set(categorizedTransactions.map(t => t.category))] }
-        }
-      ];
-
-      console.log(`[DataExtraction] Analysis completed successfully`);
-      return {
-        agent_type: 'data_extraction',
-        insights: insights,
-        metadata: {
-          categorized_transactions: categorizedTransactions,
-          summary: {
-            total_transactions: transactions.length,
-            categories_found: [...new Set(categorizedTransactions.map(t => t.category))],
-            data_quality_score: 0.8
-          }
-        }
-      };
-    } catch (error) {
-      console.error('[DataExtraction] Error during analysis:', error);
-      return {
-        agent_type: 'data_extraction',
-        insights: [{
-          title: 'Transaction Analysis Failed',
-          description: 'Unable to categorize transactions due to processing error.',
-          confidence: 0.5,
-          metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
-        }],
-        metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
-      };
+      
+      allCategorizedTransactions.push(...categorizedChunk);
+      
+      // Add a small delay between chunks to prevent overwhelming the system
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
+
+    // Generate insights
+    const insights = [
+      {
+        title: 'Transaction Categorization Complete',
+        description: `Successfully categorized ${transactions.length} transactions using rule-based analysis.`,
+        confidence: 0.8,
+        metadata: { 
+          method: 'rule-based',
+          chunksProcessed: chunks.length,
+          chunkSize: CHUNK_SIZE
+        }
+      },
+      {
+        title: 'Spending Categories Identified',
+        description: `Found transactions in ${categories.size} categories: ${Array.from(categories).join(', ')}`,
+        confidence: 0.9,
+        metadata: { 
+          categories: Array.from(categories),
+          categoryCount: categories.size
+        }
+      },
+      {
+        title: 'Transaction Summary',
+        description: `Processed ${allCategorizedTransactions.length} transactions across ${chunks.length} chunks.`,
+        confidence: 0.95,
+        metadata: { 
+          totalTransactions: allCategorizedTransactions.length,
+          chunksProcessed: chunks.length
+        }
+      }
+    ];
+
+    console.log(`[DataExtraction] Analysis completed successfully - ${allCategorizedTransactions.length} transactions categorized`);
+    return {
+      agent_type: 'data_extraction',
+      insights: insights,
+      metadata: {
+        categorized_transactions: allCategorizedTransactions,
+        summary: {
+          total_transactions: allCategorizedTransactions.length,
+          categories_found: Array.from(categories),
+          chunks_processed: chunks.length,
+          data_quality_score: 0.8
+        }
+      }
+    };
   }
 
   private async categorizeTransactions(transactions: Transaction[]): Promise<any[]> {

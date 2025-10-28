@@ -15,11 +15,11 @@ var __export = (target, all) => {
   for (var name2 in all)
     __defProp(target, name2, { get: all[name2], enumerable: true });
 };
-var __copyProps = (to, from, except2, desc2) => {
+var __copyProps = (to, from, except2, desc3) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except2)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc3 = __getOwnPropDesc(from, key)) || desc3.enumerable });
   }
   return to;
 };
@@ -39812,14 +39812,38 @@ var DatabaseService = class {
   }
   // Session operations
   async createSession(session) {
-    return await this.db.insert(sessions).values(session).returning();
+    try {
+      return await this.db.insert(sessions).values(session).returning();
+    } catch (error) {
+      if (error.message && error.message.includes("no column named upload_id")) {
+        console.log("Creating session without upload_id (fallback)");
+        const { upload_id, ...sessionWithoutUploadId } = session;
+        return await this.db.insert(sessions).values(sessionWithoutUploadId).returning();
+      }
+      console.log("Session creation error:", error.message);
+      console.log("Error details:", error);
+      console.log("Session object:", session);
+      console.log("Error type:", typeof error);
+      console.log("Error constructor:", error.constructor.name);
+      console.log("Error stack:", error.stack);
+      throw error;
+    }
   }
   async getSessionById(id) {
     return await this.db.select().from(sessions).where(eq(sessions.id, id)).get();
   }
   // Upload operations
   async createUpload(upload) {
-    return await this.db.insert(uploads).values(upload).returning();
+    try {
+      return await this.db.insert(uploads).values(upload).returning();
+    } catch (error) {
+      if (error.message && error.message.includes("session_id")) {
+        console.log("Creating upload without session_id (fallback)");
+        const { session_id, ...uploadWithoutSessionId } = upload;
+        return await this.db.insert(uploads).values(uploadWithoutSessionId).returning();
+      }
+      throw error;
+    }
   }
   async getUploadsByUserId(userId) {
     return await this.db.select().from(uploads).where(eq(uploads.user_id, userId)).all();
@@ -39846,7 +39870,12 @@ var DatabaseService = class {
     return await this.db.select().from(transactions).where(eq(transactions.upload_id, uploadId)).all();
   }
   async getTransactionsBySessionId(sessionId) {
-    return await this.db.select().from(transactions).innerJoin(uploads, eq(transactions.upload_id, uploads.id)).innerJoin(sessions, eq(uploads.user_id, sessions.user_id)).where(eq(sessions.id, sessionId)).all();
+    try {
+      return await this.db.select().from(transactions).where(eq(transactions.upload_id, sessionId)).all();
+    } catch (error) {
+      console.log("Error getting transactions by session:", error);
+      return [];
+    }
   }
   // Insight operations
   async createInsight(insight) {
@@ -40421,44 +40450,44 @@ var FinancialModelsClient = class {
     }
   }
   mapSentimentToCategory(sentiment, description, amount) {
-    const desc2 = description.toLowerCase();
-    if (desc2.includes("grocery") || desc2.includes("food") || desc2.includes("supermarket") || desc2.includes("whole foods") || desc2.includes("trader joe") || desc2.includes("kroger") || desc2.includes("safeway") || desc2.includes("publix") || desc2.includes("market")) {
+    const desc3 = description.toLowerCase();
+    if (desc3.includes("grocery") || desc3.includes("food") || desc3.includes("supermarket") || desc3.includes("whole foods") || desc3.includes("trader joe") || desc3.includes("kroger") || desc3.includes("safeway") || desc3.includes("publix") || desc3.includes("market")) {
       return "Groceries & Food";
     }
-    if (desc2.includes("restaurant") || desc2.includes("cafe") || desc2.includes("dining") || desc2.includes("mcdonald") || desc2.includes("starbucks") || desc2.includes("subway") || desc2.includes("pizza") || desc2.includes("burger") || desc2.includes("food")) {
+    if (desc3.includes("restaurant") || desc3.includes("cafe") || desc3.includes("dining") || desc3.includes("mcdonald") || desc3.includes("starbucks") || desc3.includes("subway") || desc3.includes("pizza") || desc3.includes("burger") || desc3.includes("food")) {
       return "Dining & Restaurants";
     }
-    if (desc2.includes("gas") || desc2.includes("fuel") || desc2.includes("shell") || desc2.includes("exxon") || desc2.includes("chevron") || desc2.includes("bp") || desc2.includes("uber") || desc2.includes("lyft") || desc2.includes("taxi") || desc2.includes("transportation") || desc2.includes("metro") || desc2.includes("bus")) {
+    if (desc3.includes("gas") || desc3.includes("fuel") || desc3.includes("shell") || desc3.includes("exxon") || desc3.includes("chevron") || desc3.includes("bp") || desc3.includes("uber") || desc3.includes("lyft") || desc3.includes("taxi") || desc3.includes("transportation") || desc3.includes("metro") || desc3.includes("bus")) {
       return "Transportation";
     }
-    if (desc2.includes("electric") || desc2.includes("water") || desc2.includes("internet") || desc2.includes("phone") || desc2.includes("cable") || desc2.includes("utility") || desc2.includes("at&t") || desc2.includes("verizon") || desc2.includes("comcast")) {
+    if (desc3.includes("electric") || desc3.includes("water") || desc3.includes("internet") || desc3.includes("phone") || desc3.includes("cable") || desc3.includes("utility") || desc3.includes("at&t") || desc3.includes("verizon") || desc3.includes("comcast")) {
       return "Utilities & Bills";
     }
-    if (desc2.includes("netflix") || desc2.includes("spotify") || desc2.includes("subscription") || desc2.includes("hulu") || desc2.includes("disney") || desc2.includes("prime") || desc2.includes("apple music") || desc2.includes("youtube") || desc2.includes("adobe")) {
+    if (desc3.includes("netflix") || desc3.includes("spotify") || desc3.includes("subscription") || desc3.includes("hulu") || desc3.includes("disney") || desc3.includes("prime") || desc3.includes("apple music") || desc3.includes("youtube") || desc3.includes("adobe")) {
       return "Subscriptions & Services";
     }
-    if (desc2.includes("amazon") || desc2.includes("target") || desc2.includes("walmart") || desc2.includes("costco") || desc2.includes("best buy") || desc2.includes("home depot") || desc2.includes("amzn") || desc2.includes("retail") || desc2.includes("store")) {
+    if (desc3.includes("amazon") || desc3.includes("target") || desc3.includes("walmart") || desc3.includes("costco") || desc3.includes("best buy") || desc3.includes("home depot") || desc3.includes("amzn") || desc3.includes("retail") || desc3.includes("store")) {
       return "Shopping & Retail";
     }
-    if (desc2.includes("medical") || desc2.includes("doctor") || desc2.includes("pharmacy") || desc2.includes("hospital") || desc2.includes("clinic") || desc2.includes("cvs") || desc2.includes("walgreens") || desc2.includes("health")) {
+    if (desc3.includes("medical") || desc3.includes("doctor") || desc3.includes("pharmacy") || desc3.includes("hospital") || desc3.includes("clinic") || desc3.includes("cvs") || desc3.includes("walgreens") || desc3.includes("health")) {
       return "Healthcare & Medical";
     }
-    if (desc2.includes("hotel") || desc2.includes("travel") || desc2.includes("flight") || desc2.includes("airline") || desc2.includes("booking") || desc2.includes("expedia") || desc2.includes("airbnb") || desc2.includes("marriott") || desc2.includes("hilton")) {
+    if (desc3.includes("hotel") || desc3.includes("travel") || desc3.includes("flight") || desc3.includes("airline") || desc3.includes("booking") || desc3.includes("expedia") || desc3.includes("airbnb") || desc3.includes("marriott") || desc3.includes("hilton")) {
       return "Travel & Hotels";
     }
-    if (desc2.includes("salary") || desc2.includes("deposit") || desc2.includes("income") || desc2.includes("payroll") || desc2.includes("direct deposit") || desc2.includes("refund") || desc2.includes("cashback") || desc2.includes("interest")) {
+    if (desc3.includes("salary") || desc3.includes("deposit") || desc3.includes("income") || desc3.includes("payroll") || desc3.includes("direct deposit") || desc3.includes("refund") || desc3.includes("cashback") || desc3.includes("interest")) {
       return "Income & Deposits";
     }
-    if (desc2.includes("insurance") || desc2.includes("premium") || desc2.includes("coverage")) {
+    if (desc3.includes("insurance") || desc3.includes("premium") || desc3.includes("coverage")) {
       return "Insurance";
     }
-    if (desc2.includes("school") || desc2.includes("university") || desc2.includes("education") || desc2.includes("tuition") || desc2.includes("student") || desc2.includes("course")) {
+    if (desc3.includes("school") || desc3.includes("university") || desc3.includes("education") || desc3.includes("tuition") || desc3.includes("student") || desc3.includes("course")) {
       return "Education";
     }
-    if (desc2.includes("investment") || desc2.includes("savings") || desc2.includes("retirement") || desc2.includes("401k") || desc2.includes("ira") || desc2.includes("mutual fund") || desc2.includes("stock") || desc2.includes("bond")) {
+    if (desc3.includes("investment") || desc3.includes("savings") || desc3.includes("retirement") || desc3.includes("401k") || desc3.includes("ira") || desc3.includes("mutual fund") || desc3.includes("stock") || desc3.includes("bond")) {
       return "Investments & Savings";
     }
-    if (desc2.includes("transfer") || desc2.includes("payment") || desc2.includes("venmo") || desc2.includes("paypal") || desc2.includes("zelle") || desc2.includes("cash app")) {
+    if (desc3.includes("transfer") || desc3.includes("payment") || desc3.includes("venmo") || desc3.includes("paypal") || desc3.includes("zelle") || desc3.includes("cash app")) {
       return "Transfers";
     }
     if (amount && amount < 0) {
@@ -40582,10 +40611,20 @@ var DataExtractionAgent = class extends BaseAgent {
     this.financialModels = new FinancialModelsClient();
   }
   async execute(transactions2) {
-    try {
-      console.log(`[DataExtraction] Starting analysis of ${transactions2.length} transactions`);
-      const categorizedTransactions = transactions2.map((transaction) => {
-        const description = transaction.description.toLowerCase();
+    console.log(`[DataExtraction] Starting analysis of ${transactions2.length} transactions`);
+    const CHUNK_SIZE = 50;
+    const chunks = [];
+    for (let i = 0; i < transactions2.length; i += CHUNK_SIZE) {
+      chunks.push(transactions2.slice(i, i + CHUNK_SIZE));
+    }
+    console.log(`[DataExtraction] Processing ${chunks.length} chunks of up to ${CHUNK_SIZE} transactions each`);
+    const allCategorizedTransactions = [];
+    const categories = /* @__PURE__ */ new Set();
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`[DataExtraction] Processing chunk ${i + 1}/${chunks.length} (${chunk.length} transactions)`);
+      const categorizedChunk = chunk.map((transaction) => {
+        const description = transaction.description?.toLowerCase() || "";
         let category = "Other";
         if (description.includes("amazon") || description.includes("amzn")) {
           category = "Shopping & Retail";
@@ -40599,7 +40638,14 @@ var DataExtractionAgent = class extends BaseAgent {
           category = "Housing";
         } else if (description.includes("utility") || description.includes("electric")) {
           category = "Utilities";
+        } else if (description.includes("netflix") || description.includes("spotify")) {
+          category = "Entertainment";
+        } else if (description.includes("salary") || description.includes("deposit")) {
+          category = "Income";
+        } else if (description.includes("uber") || description.includes("lyft")) {
+          category = "Transportation";
         }
+        categories.add(category);
         return {
           id: transaction.id,
           date: transaction.date,
@@ -40612,47 +40658,55 @@ var DataExtractionAgent = class extends BaseAgent {
           sentiment: "neutral"
         };
       });
-      console.log(`[DataExtraction] Categorized ${categorizedTransactions.length} transactions`);
-      const insights2 = [
-        {
-          title: "Transaction Categorization Complete",
-          description: `Successfully categorized ${transactions2.length} transactions using rule-based analysis.`,
-          confidence: 0.8,
-          metadata: { method: "rule-based" }
-        },
-        {
-          title: "Spending Categories Identified",
-          description: `Found transactions in categories: ${[...new Set(categorizedTransactions.map((t) => t.category))].join(", ")}`,
-          confidence: 0.9,
-          metadata: { categories: [...new Set(categorizedTransactions.map((t) => t.category))] }
-        }
-      ];
-      console.log(`[DataExtraction] Analysis completed successfully`);
-      return {
-        agent_type: "data_extraction",
-        insights: insights2,
-        metadata: {
-          categorized_transactions: categorizedTransactions,
-          summary: {
-            total_transactions: transactions2.length,
-            categories_found: [...new Set(categorizedTransactions.map((t) => t.category))],
-            data_quality_score: 0.8
-          }
-        }
-      };
-    } catch (error) {
-      console.error("[DataExtraction] Error during analysis:", error);
-      return {
-        agent_type: "data_extraction",
-        insights: [{
-          title: "Transaction Analysis Failed",
-          description: "Unable to categorize transactions due to processing error.",
-          confidence: 0.5,
-          metadata: { error: error instanceof Error ? error.message : "Unknown error" }
-        }],
-        metadata: { error: error instanceof Error ? error.message : "Unknown error" }
-      };
+      allCategorizedTransactions.push(...categorizedChunk);
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
+    const insights2 = [
+      {
+        title: "Transaction Categorization Complete",
+        description: `Successfully categorized ${transactions2.length} transactions using rule-based analysis.`,
+        confidence: 0.8,
+        metadata: {
+          method: "rule-based",
+          chunksProcessed: chunks.length,
+          chunkSize: CHUNK_SIZE
+        }
+      },
+      {
+        title: "Spending Categories Identified",
+        description: `Found transactions in ${categories.size} categories: ${Array.from(categories).join(", ")}`,
+        confidence: 0.9,
+        metadata: {
+          categories: Array.from(categories),
+          categoryCount: categories.size
+        }
+      },
+      {
+        title: "Transaction Summary",
+        description: `Processed ${allCategorizedTransactions.length} transactions across ${chunks.length} chunks.`,
+        confidence: 0.95,
+        metadata: {
+          totalTransactions: allCategorizedTransactions.length,
+          chunksProcessed: chunks.length
+        }
+      }
+    ];
+    console.log(`[DataExtraction] Analysis completed successfully - ${allCategorizedTransactions.length} transactions categorized`);
+    return {
+      agent_type: "data_extraction",
+      insights: insights2,
+      metadata: {
+        categorized_transactions: allCategorizedTransactions,
+        summary: {
+          total_transactions: allCategorizedTransactions.length,
+          categories_found: Array.from(categories),
+          chunks_processed: chunks.length,
+          data_quality_score: 0.8
+        }
+      }
+    };
   }
   async categorizeTransactions(transactions2) {
     const categorizedTransactions = [];
@@ -41564,14 +41618,14 @@ var SavingsInsightAgent = class extends BaseAgent {
         totalIncome += t.amount;
       } else {
         totalExpenses += Math.abs(t.amount);
-        const desc2 = t.description.toLowerCase();
-        if (desc2.includes("subscription") || desc2.includes("netflix") || desc2.includes("spotify")) {
+        const desc3 = t.description.toLowerCase();
+        if (desc3.includes("subscription") || desc3.includes("netflix") || desc3.includes("spotify")) {
           subscriptions.push(t);
         }
-        if (desc2.includes("restaurant") || desc2.includes("coffee") || desc2.includes("dining")) {
+        if (desc3.includes("restaurant") || desc3.includes("coffee") || desc3.includes("dining")) {
           diningExpenses.push(t);
         }
-        if (desc2.includes("entertainment") || desc2.includes("movie") || desc2.includes("gym")) {
+        if (desc3.includes("entertainment") || desc3.includes("movie") || desc3.includes("gym")) {
           entertainmentExpenses.push(t);
         }
       }
@@ -45179,8 +45233,8 @@ var CFB = /* @__PURE__ */ (/* @__PURE__ */ __name(function _CFB() {
     var out = [], cdirs = [];
     var o = new_buf(1);
     var method = _opts.compression ? 8 : 0, flags = 0;
-    var desc2 = false;
-    if (desc2) flags |= 8;
+    var desc3 = false;
+    if (desc3) flags |= 8;
     var i2 = 0, j = 0;
     var start_cd = 0, fcnt = 0;
     var root = cfb.FullPaths[0], fp = root, fi = cfb.FileIndex[0];
@@ -69743,6 +69797,18 @@ app.get("/api/debug", (c) => {
     keyPrefix: c.env.HUGGINGFACE_API_KEY?.substring(0, 10) || "none"
   });
 });
+app.get("/api/debug-transactions/:session_id", async (c) => {
+  const sessionId = c.req.param("session_id");
+  const db = new DatabaseService(c.env.DB);
+  const transactions2 = await db.getTransactionsBySessionId(sessionId);
+  return c.json({
+    sessionId,
+    transactionCount: transactions2.length,
+    transactions: transactions2.slice(0, 3),
+    // First 3 transactions
+    sampleTransaction: transactions2[0] || null
+  });
+});
 app.get("/api/test-hf", async (c) => {
   try {
     if (!c.env.HUGGINGFACE_API_KEY) {
@@ -69845,8 +69911,6 @@ app.post("/api/upload", async (c) => {
       user = newUser[0];
     }
     const userId = user.id;
-    const sessionId = "session-" + Date.now();
-    await db.createSession({ id: sessionId, user_id: userId });
     const uploadId = "upload-" + Date.now();
     await db.createUpload({
       id: uploadId,
@@ -69870,7 +69934,8 @@ app.post("/api/upload", async (c) => {
       success: true,
       data: {
         upload_id: uploadId,
-        session_id: sessionId,
+        session_id: uploadId,
+        // Use upload_id as session_id for now
         transaction_count: transactions2.length,
         status: "analyzed"
       }
@@ -69894,20 +69959,22 @@ app.post("/api/analyze", async (c) => {
       return c.json({ success: false, error: "Session ID required" }, 400);
     }
     const db = new DatabaseService(c.env.DB);
-    const sessionData = await db.getSessionWithData(session_id);
-    console.log("Session data found:", !!sessionData);
-    console.log("Transaction count:", sessionData?.transactions?.length || 0);
-    if (!sessionData) {
-      return c.json({ success: false, error: "Session not found" }, 404);
+    const transactions2 = await db.getTransactionsBySessionId(session_id);
+    console.log("Transactions found:", transactions2.length);
+    if (transactions2.length === 0) {
+      return c.json({ success: false, error: "No transactions found for this upload" }, 404);
     }
     console.log("Starting agent orchestration...");
+    console.log("Transaction data:", JSON.stringify(transactions2.slice(0, 2), null, 2));
     let analysisResult;
     try {
       const orchestrator = new AgentOrchestrator(c.env.HUGGINGFACE_API_KEY);
-      analysisResult = await orchestrator.executeAnalysis(session_id, sessionData.transactions);
+      analysisResult = await orchestrator.executeAnalysis(session_id, transactions2);
       console.log("Agent orchestration completed", { hasResponses: !!analysisResult.agent_responses, responseCount: analysisResult.agent_responses?.length });
+      console.log("Analysis result:", JSON.stringify(analysisResult, null, 2));
     } catch (orchError) {
       console.error("Orchestrator threw error:", orchError);
+      console.error("Orchestrator error stack:", orchError.stack);
       throw orchError;
     }
     console.log("Storing insights in database...");

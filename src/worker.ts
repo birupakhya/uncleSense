@@ -32,6 +32,20 @@ app.get('/api/debug', (c) => {
   });
 });
 
+// Debug transactions endpoint
+app.get('/api/debug-transactions/:session_id', async (c) => {
+  const sessionId = c.req.param('session_id');
+  const db = new DatabaseService(c.env.DB);
+  const transactions = await db.getTransactionsBySessionId(sessionId);
+  
+  return c.json({
+    sessionId,
+    transactionCount: transactions.length,
+    transactions: transactions.slice(0, 3), // First 3 transactions
+    sampleTransaction: transactions[0] || null
+  });
+});
+
 // Test Hugging Face API endpoint
 app.get('/api/test-hf', async (c) => {
   try {
@@ -168,11 +182,7 @@ app.post('/api/upload', async (c) => {
     
     const userId = user.id;
 
-    // Create session
-    const sessionId = 'session-' + Date.now();
-    await db.createSession({ id: sessionId, user_id: userId });
-
-    // Create upload record
+    // Create upload record (skip session for now due to schema mismatch)
     const uploadId = 'upload-' + Date.now();
     await db.createUpload({
       id: uploadId,
@@ -202,7 +212,7 @@ app.post('/api/upload', async (c) => {
       success: true,
       data: {
         upload_id: uploadId,
-        session_id: sessionId,
+        session_id: uploadId, // Use upload_id as session_id for now
         transaction_count: transactions.length,
         status: 'analyzed',
       },
@@ -231,23 +241,26 @@ app.post('/api/analyze', async (c) => {
     }
 
     const db = new DatabaseService(c.env.DB);
-    const sessionData = await db.getSessionWithData(session_id);
-    console.log('Session data found:', !!sessionData);
-    console.log('Transaction count:', sessionData?.transactions?.length || 0);
+    // Since we're using upload_id as session_id, get transactions directly
+    const transactions = await db.getTransactionsBySessionId(session_id);
+    console.log('Transactions found:', transactions.length);
     
-    if (!sessionData) {
-      return c.json({ success: false, error: 'Session not found' }, 404);
+    if (transactions.length === 0) {
+      return c.json({ success: false, error: 'No transactions found for this upload' }, 404);
     }
 
     // Run agent orchestration
     console.log('Starting agent orchestration...');
+    console.log('Transaction data:', JSON.stringify(transactions.slice(0, 2), null, 2));
     let analysisResult;
     try {
       const orchestrator = new AgentOrchestrator(c.env.HUGGINGFACE_API_KEY);
-      analysisResult = await orchestrator.executeAnalysis(session_id, sessionData.transactions);
+      analysisResult = await orchestrator.executeAnalysis(session_id, transactions);
       console.log('Agent orchestration completed', { hasResponses: !!analysisResult.agent_responses, responseCount: analysisResult.agent_responses?.length });
+      console.log('Analysis result:', JSON.stringify(analysisResult, null, 2));
     } catch (orchError) {
       console.error('Orchestrator threw error:', orchError);
+      console.error('Orchestrator error stack:', orchError.stack);
       throw orchError;
     }
 
