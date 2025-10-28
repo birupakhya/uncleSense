@@ -41984,24 +41984,22 @@ var AgentOrchestrator = class {
         state.current_step = "analysis";
       }
       console.log("Data extraction step completed");
-      console.log("Running analysis agents in parallel...");
-      const [spendingResponse, savingsResponse, riskResponse] = await Promise.all([
-        this.spendingAnalysisAgent.execute(transactions2),
-        this.savingsInsightAgent.execute(transactions2),
-        this.riskAssessmentAgent.execute(transactions2)
-      ]);
-      console.log("Analysis agents completed");
+      console.log("Running spending analysis agent...");
+      const spendingResponse = await this.spendingAnalysisAgent.execute(transactions2);
+      console.log("Spending analysis completed");
       state.agent_responses = [
         dataExtractionResponse,
-        spendingResponse,
-        savingsResponse,
-        riskResponse
+        spendingResponse
       ];
       console.log("Generating Uncle's response...");
       state.current_step = "personality_transform";
-      const uncleResponse = await this.unclePersonalityAgent.execute(state.agent_responses);
-      state.agent_responses.push(uncleResponse);
-      state.uncle_response = uncleResponse.insights[0]?.description || "Uncle is processing...";
+      const totalSpent = spendingResponse.metadata?.summary?.total_spent || 0;
+      const topCategory = spendingResponse.metadata?.insights?.highest_spending_category || "Unknown";
+      state.uncle_response = `Hey there, sport! I just took a look at your spending and here's what I found:
+
+You spent $${totalSpent.toFixed(2)} total, with most of it going to ${topCategory}. That's not too shabby! 
+
+The good news is you're keeping track of your money, and that's the first step to financial success. Keep up the good work! \u{1F604}`;
       state.current_step = "complete";
       console.log("Analysis complete!");
       return state;
