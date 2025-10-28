@@ -7,8 +7,10 @@ export abstract class BaseAgent {
   protected huggingFaceClient: HuggingFaceClient;
   protected model: string;
 
-  constructor(apiKey: string, model: string = DEFAULT_MODEL) {
-    this.huggingFaceClient = new HuggingFaceClient(apiKey);
+  constructor(apiKey?: string, model: string = DEFAULT_MODEL) {
+    // Use provided API key or get from environment
+    const finalApiKey = apiKey || process.env.HUGGINGFACE_API_KEY || '';
+    this.huggingFaceClient = new HuggingFaceClient(finalApiKey);
     this.model = model;
   }
 
@@ -24,6 +26,50 @@ export abstract class BaseAgent {
       console.error(`Error in ${this.constructor.name}:`, error);
       throw new Error(`Failed to generate response: ${error}`);
     }
+  }
+
+  protected async generateFinancialInsight(prompt: string, options?: {
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<string> {
+    try {
+      return await this.huggingFaceClient.generateFinancialInsight(prompt, options);
+    } catch (error) {
+      console.error(`Financial insight generation error in ${this.constructor.name}:`, error);
+      throw new Error(`Failed to generate financial insight: ${error}`);
+    }
+  }
+
+  protected async generateFinancialRecommendations(prompt: string, options?: {
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<string> {
+    try {
+      return await this.huggingFaceClient.generateFinancialRecommendations(prompt, options);
+    } catch (error) {
+      console.error(`Financial recommendations generation error in ${this.constructor.name}:`, error);
+      throw new Error(`Failed to generate financial recommendations: ${error}`);
+    }
+  }
+
+  protected async analyzeFinancialData(prompt: string, options?: {
+    maxTokens?: number;
+    temperature?: number;
+  }): Promise<string> {
+    try {
+      return await this.huggingFaceClient.analyzeFinancialData(prompt, options);
+    } catch (error) {
+      console.error(`Financial data analysis error in ${this.constructor.name}:`, error);
+      throw new Error(`Failed to analyze financial data: ${error}`);
+    }
+  }
+
+  protected formatFinancialPrompt(
+    systemContext: string,
+    financialData: any,
+    analysisType: 'spending' | 'patterns' | 'recommendations' | 'health'
+  ): string {
+    return this.huggingFaceClient.formatFinancialPrompt(systemContext, financialData, analysisType);
   }
 
   protected formatPrompt(systemPrompt: string, userInput: string): string {

@@ -4,6 +4,10 @@ import { BaseAgent } from './base-agent';
 import type { AgentResponse, Insight } from '../../types';
 
 export class UnclePersonalityAgent extends BaseAgent {
+  constructor(apiKey?: string) {
+    super(apiKey);
+  }
+
   async execute(agentResponses: AgentResponse[]): Promise<AgentResponse> {
     const systemPrompt = `You are Uncle Sense - a wise, funny, slightly quirky uncle who gives financial advice. You have decades of experience with money, and you're here to help your favorite niece/nephew with their finances.
 
@@ -60,7 +64,7 @@ Respond with a JSON object containing:
     }));
     
     try {
-      const response = await this.generateResponse(prompt, { 
+      const response = await this.huggingFaceClient.generateUnclePersonalityResponse(prompt, { 
         maxTokens: 1000,
         temperature: 0.8 // Higher temperature for more creative responses
       });

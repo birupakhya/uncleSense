@@ -6,8 +6,10 @@ import type {
   AnalysisResponse, 
   Insight, 
   Transaction, 
-  ChatMessage 
-} from '../types';
+  ChatMessage,
+  AgentStatus,
+  ContextualChatMessage
+} from '../../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
 
@@ -93,7 +95,10 @@ class ApiClient {
 
   // Send chat message
   async sendChatMessage(sessionId: string, message: string): Promise<ApiResponse<{
-    response: string;
+    message: string;
+    relatedInsight?: string;
+    followUpQuestions?: string[];
+    quickActions?: string[];
     session_id: string;
   }>> {
     return this.request('/api/chat', {
@@ -104,10 +109,40 @@ class ApiClient {
 
   // Get chat history
   async getChatHistory(sessionId: string): Promise<ApiResponse<{
-    messages: ChatMessage[];
+    messages: ContextualChatMessage[];
     session_id: string;
   }>> {
     return this.request(`/api/chat/${sessionId}`);
+  }
+
+  // Get agent status
+  async getAgentStatus(sessionId: string): Promise<ApiResponse<{
+    agents: AgentStatus[];
+    overall_progress: number;
+    session_id: string;
+  }>> {
+    return this.request(`/api/agents/${sessionId}/status`);
+  }
+
+  // Update agent configuration
+  async updateAgentConfig(sessionId: string, config: any): Promise<ApiResponse<{
+    success: boolean;
+    config: any;
+  }>> {
+    return this.request('/api/agents/config', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: sessionId, config }),
+    });
+  }
+
+  // Get spending analysis
+  async getSpendingAnalysis(sessionId: string): Promise<ApiResponse<{
+    categories: any[];
+    insights: any[];
+    trends: any[];
+    session_id: string;
+  }>> {
+    return this.request(`/api/spending/${sessionId}`);
   }
 
   // Health check

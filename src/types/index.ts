@@ -141,3 +141,61 @@ export interface DashboardProps {
   transactions: Transaction[];
   isLoading: boolean;
 }
+
+// Agent Status and Configuration types
+export interface AgentStatus {
+  id: string;
+  name: string;
+  status: 'idle' | 'processing' | 'complete' | 'error';
+  progress: number;
+  currentTask: string;
+  lastUpdate: Date;
+  insights: Insight[];
+}
+
+export interface AgentConfiguration {
+  dataExtractionSensitivity: number; // 1-5
+  spendingAlertThreshold: number; // percentage
+  savingsGoalAmount?: number;
+  riskTolerance: 'low' | 'medium' | 'high';
+  notificationPreferences: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+  };
+}
+
+// Enhanced spending analysis types
+export interface SpendingCategory {
+  name: string;
+  amount: number;
+  percentage: number;
+  transactionCount: number;
+  trend: 'up' | 'down' | 'stable';
+  trendPercentage: number;
+}
+
+export interface SpendingInsight {
+  id: string;
+  title: string;
+  description: string;
+  type: 'positive' | 'warning' | 'alert';
+  value: number;
+  recommendation?: string;
+  actionable: boolean;
+}
+
+// Chat enhancement types
+export interface ContextualChatMessage extends ChatMessage {
+  context?: {
+    relatedInsight?: string;
+    suggestedQuestions?: string[];
+    quickActions?: string[];
+  };
+}
+
+export interface UnclePersonalityConfig {
+  tone: 'friendly' | 'professional' | 'humorous';
+  adviceStyle: 'conservative' | 'balanced' | 'aggressive';
+  celebrationLevel: 'subtle' | 'moderate' | 'enthusiastic';
+}

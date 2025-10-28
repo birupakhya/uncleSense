@@ -4,6 +4,10 @@ import { BaseAgent } from './base-agent';
 import type { Transaction, AgentResponse } from '../../types';
 
 export class RiskAssessmentAgent extends BaseAgent {
+  constructor(apiKey?: string) {
+    super(apiKey);
+  }
+
   async execute(transactions: Transaction[]): Promise<AgentResponse> {
     try {
       // Use rule-based analysis instead of AI for reliability
