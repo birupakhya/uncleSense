@@ -14,23 +14,34 @@ export class DataExtractionAgent extends BaseAgent {
 
   async execute(transactions: Transaction[]): Promise<AgentResponse> {
     try {
+      console.log(`[DataExtraction] Starting analysis of ${transactions.length} transactions`);
+      console.log(`[DataExtraction] HuggingFace API key available: ${!!this.huggingFaceClient}`);
+      
       // Initialize financial models
       await this.financialModels.initialize();
 
       // Step 1: Categorize transactions using financial RoBERTa model
+      console.log(`[DataExtraction] Step 1: Categorizing transactions`);
       const categorizedTransactions = await this.categorizeTransactions(transactions);
+      console.log(`[DataExtraction] Categorized ${categorizedTransactions.length} transactions`);
 
       // Step 2: Normalize merchant names using sentence transformers
+      console.log(`[DataExtraction] Step 2: Normalizing merchant names`);
       const merchantNormalization = await this.normalizeMerchants(transactions);
 
       // Step 3: Detect recurring patterns and anomalies
+      console.log(`[DataExtraction] Step 3: Detecting patterns`);
       const patterns = await this.detectPatterns(transactions);
 
       // Step 4: Calculate data quality score
+      console.log(`[DataExtraction] Step 4: Calculating data quality score`);
       const dataQualityScore = this.calculateDataQualityScore(categorizedTransactions);
 
       // Step 5: Generate insights
+      console.log(`[DataExtraction] Step 5: Generating insights`);
       const insights = this.generateInsights(categorizedTransactions, patterns, dataQualityScore);
+
+      console.log(`[DataExtraction] Analysis completed successfully`);
 
       return {
         agent_type: 'data_extraction',
@@ -49,7 +60,7 @@ export class DataExtractionAgent extends BaseAgent {
         },
       };
     } catch (error) {
-      console.error('Data Extraction Agent error:', error);
+      console.error('[DataExtraction] Agent error:', error);
       
       return {
         agent_type: 'data_extraction',
@@ -70,23 +81,31 @@ export class DataExtractionAgent extends BaseAgent {
 
     for (const transaction of transactions) {
       try {
-        const categoryResult = await this.financialModels.categorizeTransaction(
-          transaction.description,
-          transaction.amount
+        console.log(`[DataExtraction] Processing transaction: ${transaction.description}`);
+        
+        // Use HuggingFace client for sentiment analysis
+        const sentimentResult = await this.huggingFaceClient.analyzeSentiment(
+          `${transaction.description} ${transaction.amount}`
         );
-
+        
+        console.log(`[DataExtraction] Sentiment analysis result:`, sentimentResult);
+        
+        // Map sentiment to category
+        const category = this.mapSentimentToCategory(sentimentResult, transaction.amount);
+        
         categorizedTransactions.push({
           id: transaction.id,
           date: transaction.date,
           description: transaction.description,
           amount: transaction.amount,
-          category: categoryResult.category,
-          confidence: categoryResult.confidence,
+          category: category,
+          confidence: sentimentResult.confidence,
           merchant: transaction.description, // Will be normalized later
-          notes: this.generateTransactionNotes(transaction, categoryResult)
+          notes: this.generateTransactionNotes(transaction, { category, confidence: sentimentResult.confidence }),
+          sentiment: sentimentResult.label
         });
       } catch (error) {
-        console.error(`Failed to categorize transaction ${transaction.id}:`, error);
+        console.error(`[DataExtraction] Failed to categorize transaction ${transaction.id}:`, error);
         // Fallback categorization
         categorizedTransactions.push({
           id: transaction.id,
@@ -96,12 +115,38 @@ export class DataExtractionAgent extends BaseAgent {
           category: 'Other',
           confidence: 0.5,
           merchant: transaction.description,
-          notes: 'Categorized using fallback method'
+          notes: 'Categorized using fallback method',
+          sentiment: 'neutral'
         });
       }
     }
 
     return categorizedTransactions;
+  }
+
+  private mapSentimentToCategory(sentimentResult: any, amount: number): string {
+    // Map sentiment and amount to financial categories
+    const { label, confidence } = sentimentResult;
+    
+    if (amount > 0) {
+      return 'Income & Deposits';
+    }
+    
+    // For expenses, use sentiment to help categorize
+    if (label === 'positive' && confidence > 0.7) {
+      return 'Investments & Savings';
+    } else if (label === 'negative' && confidence > 0.7) {
+      return 'Bills & Utilities';
+    } else {
+      // Use amount-based categorization for neutral sentiment
+      if (Math.abs(amount) < 20) {
+        return 'Food & Dining';
+      } else if (Math.abs(amount) < 100) {
+        return 'Shopping & Retail';
+      } else {
+        return 'Major Expenses';
+      }
+    }
   }
 
   private async normalizeMerchants(transactions: Transaction[]): Promise<Map<string, string>> {
