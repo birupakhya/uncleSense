@@ -120,45 +120,60 @@ const AgentStatusPanel = ({ sessionId, onAnalysisComplete, onStatusUpdate }: Age
     if (!sessionId || !isPolling) return;
 
     try {
-      // Simulate agent progress for demo purposes
-      const updatedStatuses = agentStatuses.map(agent => {
-        if (agent.status === 'idle') {
-          return {
-            ...agent,
-            status: 'processing' as const,
-            progress: Math.min(agent.progress + Math.random() * 20, 100),
-            currentTask: getCurrentTask(agent.id, agent.progress)
-          };
-        } else if (agent.status === 'processing' && agent.progress >= 100) {
-          return {
-            ...agent,
-            status: 'complete' as const,
-            progress: 100,
-            currentTask: 'Analysis complete!'
-          };
-        }
-        return agent;
-      });
-
-      setAgentStatuses(updatedStatuses);
-
-      // Calculate overall progress
-      const totalProgress = updatedStatuses.reduce((sum, agent) => sum + agent.progress, 0);
-      const averageProgress = totalProgress / updatedStatuses.length;
-      setOverallProgress(averageProgress);
-
-      // Check if all agents are complete
-      const allComplete = updatedStatuses.every(agent => agent.status === 'complete');
-      if (allComplete && onAnalysisComplete) {
-        setIsPolling(false);
-        onAnalysisComplete();
-        toast({
-          title: "Analysis complete! 🎉",
-          description: "Uncle has finished analyzing your finances. Check the insights tab!",
+      // Check actual analysis status from backend
+      const response = await apiClient.analyzeFinances(sessionId);
+      
+      if (response.success && response.data) {
+        // Update agent statuses based on actual analysis results
+        const updatedStatuses = agentStatuses.map(agent => {
+          // Check if this agent has completed based on the analysis response
+          const hasInsights = response.data.insights_count > 0;
+          
+          if (hasInsights) {
+            return {
+              ...agent,
+              status: 'complete' as const,
+              progress: 100,
+              currentTask: 'Analysis complete!'
+            };
+          } else {
+            return {
+              ...agent,
+              status: 'processing' as const,
+              progress: Math.min(agent.progress + 25, 90), // Gradual progress
+              currentTask: getCurrentTask(agent.id, agent.progress)
+            };
+          }
         });
+
+        setAgentStatuses(updatedStatuses);
+
+        // Calculate overall progress
+        const totalProgress = updatedStatuses.reduce((sum, agent) => sum + agent.progress, 0);
+        const averageProgress = totalProgress / updatedStatuses.length;
+        setOverallProgress(averageProgress);
+
+        // Check if analysis is complete
+        if (response.data.analysis_complete && onAnalysisComplete) {
+          setIsPolling(false);
+          onAnalysisComplete();
+          toast({
+            title: "Analysis complete! 🎉",
+            description: "Uncle has finished analyzing your finances. Check the insights tab!",
+          });
+        } else {
+          // Continue polling
+          setTimeout(pollAgentStatus, 2000);
+        }
       } else {
-        // Continue polling
-        setTimeout(pollAgentStatus, 2000);
+        // Analysis failed or not found
+        const updatedStatuses = agentStatuses.map(agent => ({
+          ...agent,
+          status: 'error' as const,
+          currentTask: 'Analysis failed'
+        }));
+        setAgentStatuses(updatedStatuses);
+        setIsPolling(false);
       }
     } catch (error) {
       console.error('Failed to poll agent status:', error);
