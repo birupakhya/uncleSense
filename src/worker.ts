@@ -23,6 +23,40 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Logs endpoint
+app.get('/api/logs', async (c) => {
+  try {
+    const sessionId = c.req.query('session_id');
+    
+    if (!sessionId) {
+      return c.json({ success: false, error: 'Session ID required' }, 400);
+    }
+
+    // For now, return mock logs - in production this would fetch from a logging service
+    const mockLogs = [
+      {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: 'Session started',
+        source: 'backend'
+      },
+      {
+        id: (Date.now() + 1).toString(),
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: 'Hugging Face API key loaded',
+        source: 'huggingface',
+        details: { hasKey: !!c.env.HUGGINGFACE_API_KEY }
+      }
+    ];
+
+    return c.json({ success: true, logs: mockLogs });
+  } catch (error) {
+    return c.json({ success: false, error: 'Failed to fetch logs' }, 500);
+  }
+});
+
 // File upload endpoint
 app.post('/api/upload', async (c) => {
   try {

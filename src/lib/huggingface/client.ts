@@ -19,9 +19,29 @@ export class HuggingFaceClient {
   private apiKey: string;
   private baseUrl = 'https://api-inference.huggingface.co/models';
   private transformersUrl = 'https://huggingface.co/api/models';
+  private logs: Array<{timestamp: string, level: string, message: string, details?: any}> = [];
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+  }
+
+  private log(level: string, message: string, details?: any) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      details
+    };
+    this.logs.push(logEntry);
+    console.log(`[HuggingFace] ${level.toUpperCase()}: ${message}`, details || '');
+  }
+
+  getLogs() {
+    return this.logs;
+  }
+
+  clearLogs() {
+    this.logs = [];
   }
 
   async generateText(
@@ -237,7 +257,14 @@ export class HuggingFaceClient {
     confidence: number;
     allScores: Array<{ label: string; score: number }>;
   }> {
+    this.log('info', 'Starting sentiment analysis', { text: text.substring(0, 100) + '...' });
+    
     try {
+      this.log('info', 'Calling Hugging Face API', { 
+        model: 'soleimanian/financial-roberta-large-sentiment',
+        url: `${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`
+      });
+
       const response = await fetch(`${this.baseUrl}/soleimanian/financial-roberta-large-sentiment`, {
         method: 'POST',
         headers: {
@@ -249,36 +276,50 @@ export class HuggingFaceClient {
         }),
       });
 
+      this.log('info', 'Received API response', { 
+        status: response.status,
+        ok: response.ok 
+      });
+
       if (!response.ok) {
         throw new Error(`Sentiment analysis failed: ${response.status}`);
       }
 
       const data = await response.json();
-      
+      this.log('info', 'Parsed API response', { dataType: typeof data, isArray: Array.isArray(data) });
+
       // Handle nested array response format
       if (Array.isArray(data) && data.length > 0) {
         const results = Array.isArray(data[0]) ? data[0] : data;
         if (results.length > 0) {
-          return {
+          const result = {
             label: results[0].label,
             confidence: results[0].score,
             allScores: results
           };
+          this.log('success', 'Sentiment analysis completed', result);
+          return result;
         }
       }
-      
+
       throw new Error('Unexpected response format');
     } catch (error) {
+      this.log('error', 'Sentiment analysis failed, using fallback', { error: error.message });
       console.warn('Sentiment analysis failed, using fallback:', error);
+      
       // Fallback sentiment analysis
       const textLower = text.toLowerCase();
+      let result;
       if (textLower.includes('exceeded') || textLower.includes('growth') || textLower.includes('positive')) {
-        return { label: 'positive', confidence: 0.8, allScores: [] };
+        result = { label: 'positive', confidence: 0.8, allScores: [] };
       } else if (textLower.includes('declined') || textLower.includes('negative') || textLower.includes('plummeted')) {
-        return { label: 'negative', confidence: 0.8, allScores: [] };
+        result = { label: 'negative', confidence: 0.8, allScores: [] };
       } else {
-        return { label: 'neutral', confidence: 0.7, allScores: [] };
+        result = { label: 'neutral', confidence: 0.7, allScores: [] };
       }
+      
+      this.log('warning', 'Using fallback sentiment analysis', result);
+      return result;
     }
   }
 

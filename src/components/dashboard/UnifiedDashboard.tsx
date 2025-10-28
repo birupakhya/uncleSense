@@ -17,7 +17,8 @@ import {
   PiggyBank,
   Shield,
   Search,
-  Lightbulb
+  Lightbulb,
+  Terminal
 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import InsightsDashboard from "@/components/InsightsDashboard";
@@ -25,6 +26,7 @@ import ChatInterface from "@/components/ChatInterface";
 import AgentStatusPanel from "./AgentStatusPanel";
 import InteractiveSpendingDashboard from "./InteractiveSpendingDashboard";
 import AgentSettings from "./AgentSettings";
+import LoggingPanel from "./LoggingPanel";
 import type { UploadResponse, AgentStatus, AgentConfiguration } from "@/types";
 
 interface UnifiedDashboardProps {
@@ -33,7 +35,7 @@ interface UnifiedDashboardProps {
 
 const UnifiedDashboard = ({ sessionId: initialSessionId }: UnifiedDashboardProps) => {
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
-  const [activeTab, setActiveTab] = useState<'upload' | 'agents' | 'insights' | 'chat' | 'settings'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'agents' | 'insights' | 'chat' | 'settings' | 'logs'>('upload');
   const [agentStatuses, setAgentStatuses] = useState<AgentStatus[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [agentConfig, setAgentConfig] = useState<AgentConfiguration | null>(null);
@@ -122,7 +124,7 @@ const UnifiedDashboard = ({ sessionId: initialSessionId }: UnifiedDashboardProps
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
               Upload
@@ -145,6 +147,10 @@ const UnifiedDashboard = ({ sessionId: initialSessionId }: UnifiedDashboardProps
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Settings
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="flex items-center gap-2">
+              <Terminal className="w-4 h-4" />
+              Logs
             </TabsTrigger>
           </TabsList>
 
@@ -288,6 +294,11 @@ const UnifiedDashboard = ({ sessionId: initialSessionId }: UnifiedDashboardProps
               sessionId={sessionId}
               onConfigUpdate={setAgentConfig}
             />
+          </TabsContent>
+
+          {/* Logs Tab */}
+          <TabsContent value="logs" className="space-y-6">
+            <LoggingPanel sessionId={sessionId} />
           </TabsContent>
         </Tabs>
       </div>
