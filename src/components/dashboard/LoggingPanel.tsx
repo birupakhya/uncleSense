@@ -98,6 +98,15 @@ const LoggingPanel = ({ sessionId }: LoggingPanelProps) => {
     addLog('success', 'Analysis completed successfully', { insights: 5 }, 'backend');
   };
 
+  // Add debugging logs when component mounts
+  useEffect(() => {
+    if (sessionId) {
+      addLog('info', 'Logging panel initialized', { sessionId }, 'frontend');
+      addLog('info', `API Base URL: ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'}`, null, 'frontend');
+      addLog('warning', 'Backend logs endpoint not available - using frontend logs only', null, 'frontend');
+    }
+  }, [sessionId]);
+
   // Auto-refresh when live mode is on
   useEffect(() => {
     if (isLive && sessionId) {
