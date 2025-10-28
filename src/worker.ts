@@ -23,6 +23,15 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint to check environment variables
+app.get('/api/debug', (c) => {
+  return c.json({ 
+    hasHuggingFaceKey: !!c.env.HUGGINGFACE_API_KEY,
+    keyLength: c.env.HUGGINGFACE_API_KEY?.length || 0,
+    keyPrefix: c.env.HUGGINGFACE_API_KEY?.substring(0, 10) || 'none'
+  });
+});
+
 // Logs endpoint
 app.get('/api/logs', async (c) => {
   try {
