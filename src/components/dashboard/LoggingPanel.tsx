@@ -53,21 +53,30 @@ const LoggingPanel = ({ sessionId }: LoggingPanelProps) => {
 
   // Fetch logs from backend
   const fetchLogs = async () => {
-    if (!sessionId) return;
+    if (!sessionId || isLoading) return; // Prevent multiple simultaneous requests
     
     setIsLoading(true);
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787';
       const url = `${apiBaseUrl}/api/logs?session_id=${sessionId}`;
       
-      addLog('info', `Fetching logs from: ${url}`, { sessionId }, 'frontend');
+      // Only log the URL once to avoid spam
+      if (logs.length === 0 || !logs.some(log => log.message.includes('Fetching logs from'))) {
+        addLog('info', `Fetching logs from: ${url}`, { sessionId }, 'frontend');
+      }
       
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        if (data.logs) {
-          setLogs(prev => [...data.logs, ...prev].slice(0, 100));
-          addLog('success', `Retrieved ${data.logs.length} logs from backend`, null, 'frontend');
+        if (data.logs && data.logs.length > 0) {
+          // Only add new logs that we don't already have
+          const existingIds = new Set(logs.map(log => log.id));
+          const newLogs = data.logs.filter((log: LogEntry) => !existingIds.has(log.id));
+          
+          if (newLogs.length > 0) {
+            setLogs(prev => [...newLogs, ...prev].slice(0, 100));
+            addLog('success', `Retrieved ${newLogs.length} new logs from backend`, null, 'frontend');
+          }
         }
       } else {
         addLog('error', `API request failed: ${response.status} ${response.statusText}`, { url }, 'frontend');
@@ -92,7 +101,7 @@ const LoggingPanel = ({ sessionId }: LoggingPanelProps) => {
   // Auto-refresh when live mode is on
   useEffect(() => {
     if (isLive && sessionId) {
-      const interval = setInterval(fetchLogs, 2000); // Fetch every 2 seconds
+      const interval = setInterval(fetchLogs, 5000); // Fetch every 5 seconds (less frequent)
       return () => clearInterval(interval);
     }
   }, [isLive, sessionId]);
