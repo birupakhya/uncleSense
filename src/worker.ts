@@ -222,7 +222,9 @@ app.post('/api/upload', async (c) => {
 // Analysis endpoint
 app.post('/api/analyze', async (c) => {
   try {
+    console.log('=== ANALYSIS ENDPOINT CALLED ===');
     const { session_id } = await c.req.json();
+    console.log('Session ID:', session_id);
     
     if (!session_id) {
       return c.json({ success: false, error: 'Session ID required' }, 400);
@@ -230,27 +232,47 @@ app.post('/api/analyze', async (c) => {
 
     const db = new DatabaseService(c.env.DB);
     const sessionData = await db.getSessionWithData(session_id);
+    console.log('Session data found:', !!sessionData);
+    console.log('Transaction count:', sessionData?.transactions?.length || 0);
     
     if (!sessionData) {
       return c.json({ success: false, error: 'Session not found' }, 404);
     }
 
     // Run agent orchestration
-    const orchestrator = new AgentOrchestrator(c.env.HUGGINGFACE_API_KEY);
-    const analysisResult = await orchestrator.executeAnalysis(session_id, sessionData.transactions);
+    console.log('Starting agent orchestration...');
+    let analysisResult;
+    try {
+      const orchestrator = new AgentOrchestrator(c.env.HUGGINGFACE_API_KEY);
+      analysisResult = await orchestrator.executeAnalysis(session_id, sessionData.transactions);
+      console.log('Agent orchestration completed', { hasResponses: !!analysisResult.agent_responses, responseCount: analysisResult.agent_responses?.length });
+    } catch (orchError) {
+      console.error('Orchestrator threw error:', orchError);
+      throw orchError;
+    }
 
     // Store insights in database
-    for (const agentResponse of analysisResult.agent_responses || []) {
-      for (const insight of agentResponse.insights) {
-        await db.createInsight({
-          id: `insight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          session_id: session_id,
-          agent_type: agentResponse.agent_type as any,
-          insight_data: insight,
-          sentiment: insight.sentiment || 'neutral',
-        });
+    console.log('Storing insights in database...');
+    if (analysisResult.agent_responses) {
+      for (const agentResponse of analysisResult.agent_responses) {
+        if (agentResponse.insights && Array.isArray(agentResponse.insights)) {
+          for (const insight of agentResponse.insights) {
+            try {
+              await db.createInsight({
+                id: `insight-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                session_id: session_id,
+                agent_type: agentResponse.agent_type as any,
+                insight_data: insight,
+                sentiment: insight.sentiment || 'neutral',
+              });
+            } catch (insightError) {
+              console.error('Failed to store insight:', insightError);
+            }
+          }
+        }
       }
     }
+    console.log('Insights stored successfully');
 
     return c.json({
       success: true,

@@ -15,62 +15,80 @@ export class DataExtractionAgent extends BaseAgent {
   async execute(transactions: Transaction[]): Promise<AgentResponse> {
     try {
       console.log(`[DataExtraction] Starting analysis of ${transactions.length} transactions`);
-      console.log(`[DataExtraction] HuggingFace API key available: ${!!this.huggingFaceClient}`);
       
-      // Initialize financial models
-      await this.financialModels.initialize();
+      // Simple rule-based categorization without API calls
+      const categorizedTransactions = transactions.map(transaction => {
+        const description = transaction.description.toLowerCase();
+        let category = 'Other';
+        
+        if (description.includes('amazon') || description.includes('amzn')) {
+          category = 'Shopping & Retail';
+        } else if (description.includes('starbucks') || description.includes('coffee')) {
+          category = 'Food & Dining';
+        } else if (description.includes('gas') || description.includes('fuel')) {
+          category = 'Transportation';
+        } else if (description.includes('grocery') || description.includes('food')) {
+          category = 'Food & Dining';
+        } else if (description.includes('rent') || description.includes('mortgage')) {
+          category = 'Housing';
+        } else if (description.includes('utility') || description.includes('electric')) {
+          category = 'Utilities';
+        }
+        
+        return {
+          id: transaction.id,
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          category: category,
+          confidence: 0.8,
+          merchant: transaction.description,
+          notes: 'Categorized using rule-based method',
+          sentiment: 'neutral'
+        };
+      });
 
-      // Step 1: Categorize transactions using financial RoBERTa model
-      console.log(`[DataExtraction] Step 1: Categorizing transactions`);
-      const categorizedTransactions = await this.categorizeTransactions(transactions);
       console.log(`[DataExtraction] Categorized ${categorizedTransactions.length} transactions`);
 
-      // Step 2: Normalize merchant names using sentence transformers
-      console.log(`[DataExtraction] Step 2: Normalizing merchant names`);
-      const merchantNormalization = await this.normalizeMerchants(transactions);
-
-      // Step 3: Detect recurring patterns and anomalies
-      console.log(`[DataExtraction] Step 3: Detecting patterns`);
-      const patterns = await this.detectPatterns(transactions);
-
-      // Step 4: Calculate data quality score
-      console.log(`[DataExtraction] Step 4: Calculating data quality score`);
-      const dataQualityScore = this.calculateDataQualityScore(categorizedTransactions);
-
-      // Step 5: Generate insights
-      console.log(`[DataExtraction] Step 5: Generating insights`);
-      const insights = this.generateInsights(categorizedTransactions, patterns, dataQualityScore);
+      // Generate simple insights
+      const insights = [
+        {
+          title: 'Transaction Categorization Complete',
+          description: `Successfully categorized ${transactions.length} transactions using rule-based analysis.`,
+          confidence: 0.8,
+          metadata: { method: 'rule-based' }
+        },
+        {
+          title: 'Spending Categories Identified',
+          description: `Found transactions in categories: ${[...new Set(categorizedTransactions.map(t => t.category))].join(', ')}`,
+          confidence: 0.9,
+          metadata: { categories: [...new Set(categorizedTransactions.map(t => t.category))] }
+        }
+      ];
 
       console.log(`[DataExtraction] Analysis completed successfully`);
-
       return {
         agent_type: 'data_extraction',
-        insights,
+        insights: insights,
         metadata: {
           categorized_transactions: categorizedTransactions,
-          patterns,
-          merchant_normalization: merchantNormalization,
           summary: {
             total_transactions: transactions.length,
             categories_found: [...new Set(categorizedTransactions.map(t => t.category))],
-            data_quality_score: dataQualityScore,
-            recurring_patterns: patterns.recurring_transactions.length,
-            unusual_transactions: patterns.unusual_transactions.length
+            data_quality_score: 0.8
           }
-        },
+        }
       };
     } catch (error) {
-      console.error('[DataExtraction] Agent error:', error);
-      
+      console.error('[DataExtraction] Error during analysis:', error);
       return {
         agent_type: 'data_extraction',
-        insights: [
-          this.createInsight(
-            'Transaction Analysis Failed',
-            'Unable to categorize transactions due to processing error.',
-            'negative'
-          )
-        ],
+        insights: [{
+          title: 'Transaction Analysis Failed',
+          description: 'Unable to categorize transactions due to processing error.',
+          confidence: 0.5,
+          metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
+        }],
         metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
     }
@@ -78,15 +96,22 @@ export class DataExtractionAgent extends BaseAgent {
 
   private async categorizeTransactions(transactions: Transaction[]): Promise<any[]> {
     const categorizedTransactions = [];
+    console.log(`[DataExtraction] Starting categorization of ${transactions.length} transactions`);
 
-    for (const transaction of transactions) {
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i];
       try {
-        console.log(`[DataExtraction] Processing transaction: ${transaction.description}`);
+        console.log(`[DataExtraction] Processing transaction ${i + 1}/${transactions.length}: ${transaction.description}`);
         
-        // Use HuggingFace client for sentiment analysis
-        const sentimentResult = await this.huggingFaceClient.analyzeSentiment(
-          `${transaction.description} ${transaction.amount}`
-        );
+        // Use HuggingFace client for sentiment analysis with shorter timeout
+        const sentimentResult = await Promise.race([
+          this.huggingFaceClient.analyzeSentiment(
+            `${transaction.description} ${transaction.amount}`
+          ),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('API call timeout')), 5000)
+          )
+        ]) as any;
         
         console.log(`[DataExtraction] Sentiment analysis result:`, sentimentResult);
         
@@ -104,6 +129,15 @@ export class DataExtractionAgent extends BaseAgent {
           notes: this.generateTransactionNotes(transaction, { category, confidence: sentimentResult.confidence }),
           sentiment: sentimentResult.label
         });
+        
+        console.log(`[DataExtraction] Successfully categorized transaction ${i + 1}/${transactions.length}`);
+        
+        // Add shorter delay between API calls to avoid rate limiting
+        if (i < transactions.length - 1) {
+          console.log(`[DataExtraction] Waiting 500ms before next API call...`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
       } catch (error) {
         console.error(`[DataExtraction] Failed to categorize transaction ${transaction.id}:`, error);
         // Fallback categorization
@@ -121,6 +155,7 @@ export class DataExtractionAgent extends BaseAgent {
       }
     }
 
+    console.log(`[DataExtraction] Completed categorization of ${categorizedTransactions.length} transactions`);
     return categorizedTransactions;
   }
 

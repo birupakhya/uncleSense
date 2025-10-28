@@ -29,11 +29,52 @@ export class AgentOrchestrator {
     };
 
     try {
+      // Run analysis without timeout for now
+      console.log('Starting analysis without timeout...');
+      return await this.performAnalysis(sessionId, transactions, state);
+    } catch (error) {
+      console.error('Agent orchestration error:', error);
+      
+      // Return partial state with error information
+      state.current_step = 'error';
+      state.error = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Generate fallback uncle response
+      state.uncle_response = "Hey there, sport! Looks like I'm having a bit of trouble processing all this financial data right now. Don't worry though - even the best uncles have their off days! \n\nThe important thing is that you're taking control of your finances, and that's something to be proud of. Keep up the good work, and I'll be back to give you some solid advice once I get my act together! 😄\n\nIn the meantime, remember: slow and steady wins the race when it comes to money management.";
+      
+      return state;
+    }
+  }
+
+  private async performAnalysis(sessionId: string, transactions: Transaction[], state: AgentOrchestratorState): Promise<AgentOrchestratorState> {
+    try {
+      console.log('Starting performAnalysis...');
+      console.log(`Processing ${transactions.length} transactions`);
+      
       // Step 1: Data Extraction
       console.log('Starting data extraction...');
-      const dataExtractionResponse = await this.dataExtractionAgent.execute(transactions);
-      state.extracted_data = transactions; // For now, we'll use the original transactions
-      state.current_step = 'analysis';
+      let dataExtractionResponse;
+      try {
+        dataExtractionResponse = await this.dataExtractionAgent.execute(transactions);
+        console.log('Data extraction completed successfully');
+        state.extracted_data = transactions;
+        state.current_step = 'analysis';
+      } catch (dataExtractionError) {
+        console.error('Data extraction failed:', dataExtractionError);
+        dataExtractionResponse = {
+          agent_type: 'data_extraction',
+          insights: [{
+            title: 'Transaction Analysis Failed',
+            description: 'Unable to categorize transactions due to processing error.',
+            confidence: 0.5,
+            metadata: { error: dataExtractionError instanceof Error ? dataExtractionError.message : 'Unknown error' }
+          }]
+        };
+        state.extracted_data = transactions;
+        state.current_step = 'analysis';
+      }
+
+      console.log('Data extraction step completed');
 
       // Step 2: Run analysis agents in parallel
       console.log('Running analysis agents in parallel...');
@@ -42,6 +83,8 @@ export class AgentOrchestrator {
         this.savingsInsightAgent.execute(transactions),
         this.riskAssessmentAgent.execute(transactions),
       ]);
+
+      console.log('Analysis agents completed');
 
       // Step 3: Aggregate agent responses
       state.agent_responses = [
